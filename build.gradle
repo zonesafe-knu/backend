@@ -9,6 +9,7 @@ group = 'me.zonesafe'
 version = '0.0.1-SNAPSHOT'
 description = 'zonesafe_be'
 
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
