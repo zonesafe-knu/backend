@@ -8,5 +8,4 @@ public class ZonesafeBeApplication {
     public static void main(String[] args) {
         SpringApplication.run(ZonesafeBeApplication.class, args);
     }
-
 }
