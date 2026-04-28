@@ -33,4 +33,10 @@ public class CameraController {
         return ResponseEntity.ok(cameraList);
     }
 
+    //카메라 상세 조회
+    @GetMapping("/{cameraId}")
+    public ResponseEntity<CameraResponseDto> getCameraById(@PathVariable Long cameraId) {
+        CameraResponseDto camera = cameraService.getCameraById(cameraId);
+        return ResponseEntity.ok(camera);
+    }
 }

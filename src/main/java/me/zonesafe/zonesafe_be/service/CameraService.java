@@ -39,6 +39,16 @@ public class CameraService {
                 .collect(Collectors.toList());
     }
 
+    //카메라 상세 조회
+    @Transactional
+    public CameraResponseDto getCameraById(Long cameraId) {
+        Camera camera = cameraRepository.findById(cameraId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 카메라가 존재하지 않습니다."));
+
+        return modelMapper.map(camera, CameraResponseDto.class);
+    }
+
+
     //카메라 등록
     @Transactional
     public CameraResponseDto createCamera(CameraRequestDto cameraRequestDto) {
