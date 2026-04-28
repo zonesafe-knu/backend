@@ -1,5 +1,6 @@
 package me.zonesafe.zonesafe_be.domain;
 
+import lombok.Setter;
 import me.zonesafe.zonesafe_be.enums.CameraStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -9,6 +10,7 @@ import java.time.ZonedDateTime;
 @Entity
 @Table(name = "cameras")
 @Getter
+@Setter
 @NoArgsConstructor
 public class Camera {
     @Id

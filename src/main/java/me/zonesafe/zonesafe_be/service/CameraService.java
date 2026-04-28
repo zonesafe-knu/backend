@@ -2,6 +2,7 @@ package me.zonesafe.zonesafe_be.service;
 
 import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.domain.Camera;
+import me.zonesafe.zonesafe_be.dto.CameraRequestDto;
 import me.zonesafe.zonesafe_be.dto.CameraResponseDto;
 import me.zonesafe.zonesafe_be.enums.CameraStatus;
 import me.zonesafe.zonesafe_be.repository.CameraRepository;
@@ -36,5 +37,22 @@ public class CameraService {
         return cameras.stream()
                 .map(camera-> modelMapper.map(camera, CameraResponseDto.class))
                 .collect(Collectors.toList());
+    }
+
+    //카메라 등록
+    @Transactional
+    public CameraResponseDto createCamera(CameraRequestDto cameraRequestDto) {
+        //DTO -> Entity변환
+        Camera camera = modelMapper.map(cameraRequestDto, Camera.class);
+
+        //초기상태 등록
+        camera.setStatus(CameraStatus.OFFLINE);
+        camera.setSiteName("zonesafe");
+
+        //DB저장
+        Camera savedCamera = cameraRepository.save(camera);
+
+        //저장된 Entity -> ResponseDto 변환 후 반환
+        return modelMapper.map(savedCamera, CameraResponseDto.class);
     }
 }
