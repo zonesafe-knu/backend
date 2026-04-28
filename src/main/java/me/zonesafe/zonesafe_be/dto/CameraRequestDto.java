@@ -9,6 +9,7 @@ public class CameraRequestDto {
     private String name;
     private String rtspUrl;
     private Long siteId;
+    private String siteName;
     private String resolution;
     private Integer fps;
 }

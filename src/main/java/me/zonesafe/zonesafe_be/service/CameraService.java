@@ -47,7 +47,6 @@ public class CameraService {
 
         //초기상태 등록
         camera.setStatus(CameraStatus.OFFLINE);
-        camera.setSiteName("zonesafe");
 
         //DB저장
         Camera savedCamera = cameraRepository.save(camera);
