@@ -6,7 +6,6 @@ import me.zonesafe.zonesafe_be.dto.CameraResponseDto;
 import me.zonesafe.zonesafe_be.enums.CameraStatus;
 import me.zonesafe.zonesafe_be.service.CameraService;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -44,5 +43,12 @@ public class CameraController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCamera(@PathVariable Long cameraId) {
         cameraService.deleteCamera(cameraId);
+    }
+
+    //카메라 수정
+    @PutMapping("/{cameraId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateCamera(@PathVariable Long cameraId, @RequestBody CameraRequestDto cameraRequestDto) {
+        cameraService.updateCamera(cameraId, cameraRequestDto);
     }
 }

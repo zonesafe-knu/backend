@@ -40,14 +40,12 @@ public class CameraService {
     }
 
     //카메라 상세 조회
-    @Transactional
     public CameraResponseDto getCameraById(Long cameraId) {
         Camera camera = cameraRepository.findById(cameraId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 카메라가 존재하지 않습니다."));
 
         return modelMapper.map(camera, CameraResponseDto.class);
     }
-
 
     //카메라 등록
     @Transactional
@@ -73,5 +71,22 @@ public class CameraService {
                 .orElseThrow(()->new IllegalArgumentException("삭제하려는 카메라가 존재하지 않습니다. ID: " + cameraId));
 
         cameraRepository.delete(camera);
+    }
+
+    //카메라 수정
+    @Transactional
+    public void updateCamera(Long cameraId, CameraRequestDto cameraRequestDto) {
+        //수정할 카메라 존재 확인
+        Camera camera = cameraRepository.findById(cameraId)
+                .orElseThrow(()->new IllegalArgumentException("수정하려는 카메라가 존재하지 않습니다. ID: " + cameraId));
+
+        //정보 수정
+        camera.setName(cameraRequestDto.getName());
+        camera.setRtspUrl(cameraRequestDto.getRtspUrl());
+        camera.setSiteId(cameraRequestDto.getSiteId());
+        camera.setSiteName(cameraRequestDto.getSiteName());
+        camera.setResolution(cameraRequestDto.getResolution());
+        camera.setFps(cameraRequestDto.getFps());
+        camera.setStatus(cameraRequestDto.getStatus());
     }
 }

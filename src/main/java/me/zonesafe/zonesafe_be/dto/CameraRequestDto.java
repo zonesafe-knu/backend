@@ -2,7 +2,10 @@ package me.zonesafe.zonesafe_be.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import me.zonesafe.zonesafe_be.enums.CameraStatus;
 
+@Setter
 @Getter
 @NoArgsConstructor
 public class CameraRequestDto {
@@ -12,4 +15,5 @@ public class CameraRequestDto {
     private String siteName;
     private String resolution;
     private Integer fps;
+    private CameraStatus status;
 }
