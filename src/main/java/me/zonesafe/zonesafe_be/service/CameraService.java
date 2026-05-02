@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.domain.Camera;
 import me.zonesafe.zonesafe_be.dto.CameraRequestDto;
 import me.zonesafe.zonesafe_be.dto.CameraResponseDto;
+import me.zonesafe.zonesafe_be.dto.StreamResponseDto;
 import me.zonesafe.zonesafe_be.enums.CameraStatus;
 import me.zonesafe.zonesafe_be.repository.CameraRepository;
 import org.modelmapper.ModelMapper;
@@ -88,5 +89,15 @@ public class CameraService {
         camera.setResolution(cameraRequestDto.getResolution());
         camera.setFps(cameraRequestDto.getFps());
         camera.setStatus(cameraRequestDto.getStatus());
+    }
+
+    public StreamResponseDto getStreamUrl(Long cameraId) {
+        //카메라 존재 확인
+        Camera camera = cameraRepository.findById(cameraId)
+                .orElseThrow(()->new IllegalArgumentException("카메라를 찾을 수 없습니다. ID: " + cameraId));
+
+        //미디어 서버 주소 규칙에 따라 URL 생성
+        String hlsUrl = "https://zonesafe-stream.com/live/cam" + cameraId + "/index.m3u8";
+        return new StreamResponseDto(hlsUrl, "HLS");
     }
 }

@@ -3,6 +3,7 @@ package me.zonesafe.zonesafe_be.controller;
 import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.dto.CameraRequestDto;
 import me.zonesafe.zonesafe_be.dto.CameraResponseDto;
+import me.zonesafe.zonesafe_be.dto.StreamResponseDto;
 import me.zonesafe.zonesafe_be.enums.CameraStatus;
 import me.zonesafe.zonesafe_be.service.CameraService;
 import org.springframework.http.HttpStatus;
@@ -50,5 +51,12 @@ public class CameraController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateCamera(@PathVariable Long cameraId, @RequestBody CameraRequestDto cameraRequestDto) {
         cameraService.updateCamera(cameraId, cameraRequestDto);
+    }
+
+    ////실시간 스트림 URL 발급(RTSP -> HLS)
+    @GetMapping("/{cameraId}/stream")
+    @ResponseStatus(HttpStatus.OK)
+    public StreamResponseDto getStreamUrl(@PathVariable Long cameraId) {
+        return cameraService.getStreamUrl(cameraId);
     }
 }
