@@ -64,4 +64,14 @@ public class CameraService {
         //저장된 Entity -> ResponseDto 변환 후 반환
         return modelMapper.map(savedCamera, CameraResponseDto.class);
     }
+
+    //카메라 삭제
+    @Transactional
+    public void deleteCamera(Long cameraId) {
+        //삭제할 카메라가 있는지 확인
+        Camera camera = cameraRepository.findById(cameraId)
+                .orElseThrow(()->new IllegalArgumentException("삭제하려는 카메라가 존재하지 않습니다. ID: " + cameraId));
+
+        cameraRepository.delete(camera);
+    }
 }

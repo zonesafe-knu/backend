@@ -19,24 +19,30 @@ public class CameraController {
 
     //카메라 등록
     @PostMapping
-    public ResponseEntity<CameraResponseDto> createCamera(@RequestBody CameraRequestDto cameraRequestDto) {
-        CameraResponseDto savedCamera = cameraService.createCamera(cameraRequestDto);
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedCamera);
+    @ResponseStatus(HttpStatus.CREATED)
+    public CameraResponseDto createCamera(@RequestBody CameraRequestDto cameraRequestDto) {
+        return cameraService.createCamera(cameraRequestDto);
     }
 
     //카메라 조회
     @GetMapping
-    public ResponseEntity<List<CameraResponseDto>> getCameras(@RequestParam(required = false) Long siteId,
-                                                              @RequestParam(required = false) CameraStatus status){
-        List<CameraResponseDto> cameraList = cameraService.getCameras(siteId, status);
-        return ResponseEntity.ok(cameraList);
+    @ResponseStatus(HttpStatus.OK)
+    public List<CameraResponseDto> getCameras(@RequestParam(required = false) Long siteId,
+                                              @RequestParam(required = false) CameraStatus status){
+        return cameraService.getCameras(siteId, status);
     }
 
     //카메라 상세 조회
     @GetMapping("/{cameraId}")
-    public ResponseEntity<CameraResponseDto> getCameraById(@PathVariable Long cameraId) {
-        CameraResponseDto camera = cameraService.getCameraById(cameraId);
-        return ResponseEntity.ok(camera);
+    @ResponseStatus(HttpStatus.OK)
+    public CameraResponseDto getCameraById(@PathVariable Long cameraId) {
+        return cameraService.getCameraById(cameraId);
+    }
+
+    //카메라 삭제
+    @DeleteMapping("/{cameraId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteCamera(@PathVariable Long cameraId) {
+        cameraService.deleteCamera(cameraId);
     }
 }
