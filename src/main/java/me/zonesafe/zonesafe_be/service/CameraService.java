@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.domain.Camera;
 import me.zonesafe.zonesafe_be.dto.CameraRequestDto;
 import me.zonesafe.zonesafe_be.dto.CameraResponseDto;
+import me.zonesafe.zonesafe_be.dto.StreamResponseDto;
 import me.zonesafe.zonesafe_be.enums.CameraStatus;
 import me.zonesafe.zonesafe_be.repository.CameraRepository;
 import org.modelmapper.ModelMapper;
@@ -40,14 +41,12 @@ public class CameraService {
     }
 
     //카메라 상세 조회
-    @Transactional
     public CameraResponseDto getCameraById(Long cameraId) {
         Camera camera = cameraRepository.findById(cameraId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 카메라가 존재하지 않습니다."));
 
         return modelMapper.map(camera, CameraResponseDto.class);
     }
-
 
     //카메라 등록
     @Transactional
@@ -63,5 +62,42 @@ public class CameraService {
 
         //저장된 Entity -> ResponseDto 변환 후 반환
         return modelMapper.map(savedCamera, CameraResponseDto.class);
+    }
+
+    //카메라 삭제
+    @Transactional
+    public void deleteCamera(Long cameraId) {
+        //삭제할 카메라가 있는지 확인
+        Camera camera = cameraRepository.findById(cameraId)
+                .orElseThrow(()->new IllegalArgumentException("삭제하려는 카메라가 존재하지 않습니다. ID: " + cameraId));
+
+        cameraRepository.delete(camera);
+    }
+
+    //카메라 수정
+    @Transactional
+    public void updateCamera(Long cameraId, CameraRequestDto cameraRequestDto) {
+        //수정할 카메라 존재 확인
+        Camera camera = cameraRepository.findById(cameraId)
+                .orElseThrow(()->new IllegalArgumentException("수정하려는 카메라가 존재하지 않습니다. ID: " + cameraId));
+
+        //정보 수정
+        camera.setName(cameraRequestDto.getName());
+        camera.setRtspUrl(cameraRequestDto.getRtspUrl());
+        camera.setSiteId(cameraRequestDto.getSiteId());
+        camera.setSiteName(cameraRequestDto.getSiteName());
+        camera.setResolution(cameraRequestDto.getResolution());
+        camera.setFps(cameraRequestDto.getFps());
+        camera.setStatus(cameraRequestDto.getStatus());
+    }
+
+    public StreamResponseDto getStreamUrl(Long cameraId) {
+        //카메라 존재 확인
+        Camera camera = cameraRepository.findById(cameraId)
+                .orElseThrow(()->new IllegalArgumentException("카메라를 찾을 수 없습니다. ID: " + cameraId));
+
+        //미디어 서버 주소 규칙에 따라 URL 생성
+        String hlsUrl = "https://zonesafe-stream.com/live/cam" + cameraId + "/index.m3u8";
+        return new StreamResponseDto(hlsUrl, "HLS");
     }
 }
