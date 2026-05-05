@@ -49,6 +49,14 @@ public class Alarm {
 
     private Long clipId; // nullable
 
+    @Column(length = 500)
+    private String comment;
+
     @Column(nullable = false)
     private ZonedDateTime occurredAt;
+
+    public void updateStatus(AlarmStatus newStatus, String comment) {
+        this.status = newStatus;
+        this.comment = comment;
+    }
 }

@@ -44,10 +44,26 @@ public class AlarmService {
         return alarms.map(this::convertToDto);
     }
 
+    @Transactional
     public AlarmResponseDto getAlarmById(Long alarmId) {
         //ID로 알람 엔티티 조회
         Alarm alarm = alarmRepository.findById(alarmId)
                 .orElseThrow(()->new RuntimeException("해당 알람을 찾을 수 없습니다. ID: " + alarmId));
+
+        return convertToDto(alarm);
+    }
+
+    @Transactional
+    public AlarmResponseDto updateAlarmStatus(Long alarmId, AlarmStatus newStatus, String comment) {
+        //ID로 알람 엔티티 조회
+        Alarm alarm = alarmRepository.findById(alarmId)
+                .orElseThrow(()->new RuntimeException("해당 알람을 찾을 수 없습니다. ID: " + alarmId));
+
+        //사애 및 코멘트 업데이트
+        alarm.setStatus(newStatus);
+        alarm.setComment(comment);
+
+        //Transaction 덕분에 .save(alarm)으로 DB에 자동으로 update
 
         return convertToDto(alarm);
     }
