@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "cameras")
@@ -37,4 +39,12 @@ public class Camera {
     private CameraStatus status;
 
     private ZonedDateTime lastHeartbeat;
+
+    // 2. Alarm과의 양방향 연관관계 (카메라에서 알람 목록 조회 가능)
+    @OneToMany(mappedBy = "camera", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Alarm> alarms = new ArrayList<>();
+
+//    // 3. (보너스) Roi와의 양방향 관계도 동일한 원리로 추가해두면 관리가 편합니다.
+//    @OneToMany(mappedBy = "camera", cascade = CascadeType.ALL, orphanRemoval = true)
+//    private List<Roi> rois = new ArrayList<>();
 }
