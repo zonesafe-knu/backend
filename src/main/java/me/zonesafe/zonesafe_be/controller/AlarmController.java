@@ -1,7 +1,7 @@
 package me.zonesafe.zonesafe_be.controller;
 
 import lombok.RequiredArgsConstructor;
-import me.zonesafe.zonesafe_be.domain.PageResponseDto;
+import me.zonesafe.zonesafe_be.dto.PageResponseDto;
 import me.zonesafe.zonesafe_be.dto.AlarmResponseDto;
 import me.zonesafe.zonesafe_be.enums.AlarmSeverity;
 import me.zonesafe.zonesafe_be.enums.AlarmStatus;
@@ -37,5 +37,11 @@ public class AlarmController {
         Page<AlarmResponseDto> pageResult = alarmService.getAlarms(cameraId, severity, type, status, from, to, pageable);
 
         return new PageResponseDto<>(pageResult);
+    }
+
+    @GetMapping("/{alarmId}")
+    @ResponseStatus(HttpStatus.OK)
+    public AlarmResponseDto getAlarmDetail(@PathVariable Long alarmId) {
+        return alarmService.getAlarmById(alarmId);
     }
 }

@@ -44,6 +44,14 @@ public class AlarmService {
         return alarms.map(this::convertToDto);
     }
 
+    public AlarmResponseDto getAlarmById(Long alarmId) {
+        //ID로 알람 엔티티 조회
+        Alarm alarm = alarmRepository.findById(alarmId)
+                .orElseThrow(()->new RuntimeException("해당 알람을 찾을 수 없습니다. ID: " + alarmId));
+
+        return convertToDto(alarm);
+    }
+
     private AlarmResponseDto convertToDto(Alarm alarm) {
         AlarmResponseDto dto = modelMapper.map(alarm, AlarmResponseDto.class);
 
@@ -65,4 +73,5 @@ public class AlarmService {
         }
         return dto;
     }
+
 }
