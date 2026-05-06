@@ -27,6 +27,8 @@ public class AlarmResponseDto {
     private AlarmStatus status;
     private String message;
 
+    private String comment;
+
     // detectionsJson(String)을 List로 변환해서 응답하기 위한 필드
     private List<DetectionDto> detections;
 

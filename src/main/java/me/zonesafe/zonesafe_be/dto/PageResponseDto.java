@@ -1,4 +1,4 @@
-package me.zonesafe.zonesafe_be.domain;
+package me.zonesafe.zonesafe_be.dto;
 
 import lombok.Getter;
 import org.springframework.data.domain.Page;
