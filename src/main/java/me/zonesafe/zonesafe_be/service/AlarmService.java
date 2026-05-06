@@ -44,7 +44,6 @@ public class AlarmService {
         return alarms.map(this::convertToDto);
     }
 
-    @Transactional
     public AlarmResponseDto getAlarmById(Long alarmId) {
         //ID로 알람 엔티티 조회
         Alarm alarm = alarmRepository.findById(alarmId)
@@ -66,6 +65,22 @@ public class AlarmService {
         //Transaction 덕분에 .save(alarm)으로 DB에 자동으로 update
 
         return convertToDto(alarm);
+    }
+
+    @Transactional
+    public int bulkAckAlarms(List<Long> alarmIds) {
+        //요청받은 ID 리스트에 해당하는 알람들을 DB에서 한번에 조회
+        List<Alarm> alarms = alarmRepository.findAllById(alarmIds);
+
+        //조회된 알람들의 상태를 모두 ACK로 변경
+        for(Alarm alarm : alarms) {
+            alarm.setStatus(AlarmStatus.ACK);
+
+            // (선택) 일괄 처리 시 남길 기본 코멘트가 있다면 세팅
+            alarm.setComment("일괄 확인(ACK) 처리됨");
+        }
+
+        return alarms.size();
     }
 
     private AlarmResponseDto convertToDto(Alarm alarm) {

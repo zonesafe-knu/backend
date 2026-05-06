@@ -2,6 +2,7 @@ package me.zonesafe.zonesafe_be.controller;
 
 import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.domain.Alarm;
+import me.zonesafe.zonesafe_be.dto.AlarmBulkAckRequest;
 import me.zonesafe.zonesafe_be.dto.AlarmStatusUpdateRequest;
 import me.zonesafe.zonesafe_be.dto.PageResponseDto;
 import me.zonesafe.zonesafe_be.dto.AlarmResponseDto;
@@ -18,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.ZonedDateTime;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/alarms")
@@ -69,5 +71,20 @@ public class AlarmController {
     ) {
         //상태를 RESOLVE(해제)으로 변경
         return alarmService.updateAlarmStatus(alarmId, AlarmStatus.RESOLVED, request.getComment());
+    }
+
+    //알람 일괄 처리
+    @PostMapping("/bulk-ack")
+    @ResponseStatus(HttpStatus.OK)
+    public Map<String, Object> bulkAckAlarms(@RequestBody AlarmBulkAckRequest request){
+        //서비스 호출 후 업데이트된 개수 반환
+        int updatedCount = alarmService.bulkAckAlarms(request.getAlarmIds());
+
+        // 프론트엔드가 결과를 알 수 있게 간단한 JSON 형태로 응답해 줍니다.
+        return Map.of(
+                "success", true,
+                "updatedCount", updatedCount,
+                "message", updatedCount + "개의 알람이 성공적으로 확인 처리되었습니다."
+        );
     }
 }
