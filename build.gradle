@@ -35,6 +35,10 @@ dependencies {
     // 날짜/시간 처리를 위한 Jackson 확장팩 추가!
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 
+    // Redis 연동을 위한 라이브러리 추가
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
