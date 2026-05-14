@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# 민감한 DB 정보가 담긴 설정 파일 Git 추적 제외
+/src/main/resources/application.properties
