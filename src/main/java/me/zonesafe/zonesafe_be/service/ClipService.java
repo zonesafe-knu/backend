@@ -5,11 +5,16 @@ import me.zonesafe.zonesafe_be.domain.Clip;
 import me.zonesafe.zonesafe_be.dto.ClipResponseDto;
 import me.zonesafe.zonesafe_be.repository.ClipRepository;
 import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.ZonedDateTime;
 
 @Service
@@ -19,10 +24,36 @@ public class ClipService {
     private final ClipRepository clipRepository;
     private final ModelMapper modelMapper;
 
+    @Value("${clips.storage.base-path}")
+    private String basePath;
+
     //클립 목록 조회
     public Page<ClipResponseDto> getClips(Long cameraId, ZonedDateTime from, ZonedDateTime to, Pageable pageable) {
         Page<Clip> clips = clipRepository.findAllByFilter(cameraId, from, to, pageable);
         return clips.map(this::convertToDto);
+    }
+
+    //클립 다운로드용 리소스 조회
+    public Resource loadClipResource(Long clipId) {
+        Clip clip = clipRepository.findById(clipId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 클립이 존재하지 않습니다. ID: " + clipId));
+
+        Path path = resolvePath(clip.getFilePath());
+        FileSystemResource resource = new FileSystemResource(path);
+        if (!resource.exists()) {
+            throw new IllegalArgumentException("클립 파일이 존재하지 않습니다. ID: " + clipId);
+        }
+        return resource;
+    }
+
+    public Clip getClip(Long clipId) {
+        return clipRepository.findById(clipId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 클립이 존재하지 않습니다. ID: " + clipId));
+    }
+
+    private Path resolvePath(String storedPath) {
+        Path stored = Paths.get(storedPath);
+        return stored.isAbsolute() ? stored : Paths.get(basePath).resolve(storedPath).normalize();
     }
 
     private ClipResponseDto convertToDto(Clip clip) {
