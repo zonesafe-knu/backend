@@ -95,4 +95,11 @@ public class ClipController {
                 .contentType(MediaType.IMAGE_JPEG)
                 .body(resource);
     }
+
+    //클립 삭제 (TODO: Spring Security 도입 후 @PreAuthorize("hasRole('ADMIN')") 적용)
+    @DeleteMapping("/{clipId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteClip(@PathVariable Long clipId) {
+        clipService.deleteClip(clipId);
+    }
 }
