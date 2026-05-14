@@ -86,4 +86,13 @@ public class ClipController {
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .body(region);
     }
+
+    //클립 썸네일
+    @GetMapping("/{clipId}/thumbnail")
+    public ResponseEntity<Resource> getThumbnail(@PathVariable Long clipId) {
+        Resource resource = clipService.loadThumbnailResource(clipId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_JPEG)
+                .body(resource);
+    }
 }
