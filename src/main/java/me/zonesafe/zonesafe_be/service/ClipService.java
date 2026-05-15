@@ -13,6 +13,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.ZonedDateTime;
@@ -66,6 +68,26 @@ public class ClipService {
     public Clip getClip(Long clipId) {
         return clipRepository.findById(clipId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 클립이 존재하지 않습니다. ID: " + clipId));
+    }
+
+    //클립 삭제 (파일 + DB)
+    @Transactional
+    public void deleteClip(Long clipId) {
+        Clip clip = clipRepository.findById(clipId)
+                .orElseThrow(() -> new IllegalArgumentException("삭제하려는 클립이 존재하지 않습니다. ID: " + clipId));
+
+        deleteFileQuietly(clip.getFilePath());
+        deleteFileQuietly(clip.getThumbnailPath());
+
+        clipRepository.delete(clip);
+    }
+
+    private void deleteFileQuietly(String storedPath) {
+        if (storedPath == null || storedPath.isBlank()) return;
+        try {
+            Files.deleteIfExists(resolvePath(storedPath));
+        } catch (IOException ignored) {
+        }
     }
 
     private Path resolvePath(String storedPath) {
