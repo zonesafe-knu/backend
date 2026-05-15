@@ -2,8 +2,11 @@ package me.zonesafe.zonesafe_be.controller;
 
 import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.dto.PageResponseDto;
+import me.zonesafe.zonesafe_be.dto.VideoAnalyzeJobResponseDto;
+import me.zonesafe.zonesafe_be.dto.VideoAnalyzeRequestDto;
 import me.zonesafe.zonesafe_be.dto.VideoResponseDto;
 import me.zonesafe.zonesafe_be.enums.VideoStatus;
+import me.zonesafe.zonesafe_be.service.VideoAnalysisService;
 import me.zonesafe.zonesafe_be.service.VideoService;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourceRegion;
@@ -30,6 +33,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class VideoController {
     private final VideoService videoService;
+    private final VideoAnalysisService videoAnalysisService;
 
     //영상 업로드 (TODO: Spring Security 도입 후 @PreAuthorize("hasAnyRole('ADMIN','OPERATOR')") 적용)
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -128,5 +132,15 @@ public class VideoController {
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_JPEG)
                 .body(resource);
+    }
+
+    //영상 분석 시작 (TODO: Spring Security 도입 후 @PreAuthorize("hasAnyRole('ADMIN','OPERATOR')") 적용)
+    @PostMapping("/{videoId}/analyze")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Map<String, VideoAnalyzeJobResponseDto> startAnalysis(
+            @PathVariable Long videoId,
+            @RequestBody(required = false) VideoAnalyzeRequestDto request
+    ) {
+        return Map.of("data", videoAnalysisService.startAnalysis(videoId, request));
     }
 }
