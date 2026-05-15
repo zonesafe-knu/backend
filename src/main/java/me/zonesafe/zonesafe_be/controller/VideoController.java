@@ -2,6 +2,7 @@ package me.zonesafe.zonesafe_be.controller;
 
 import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.dto.PageResponseDto;
+import me.zonesafe.zonesafe_be.dto.VideoAnalysisJobStatusDto;
 import me.zonesafe.zonesafe_be.dto.VideoAnalyzeJobResponseDto;
 import me.zonesafe.zonesafe_be.dto.VideoAnalyzeRequestDto;
 import me.zonesafe.zonesafe_be.dto.VideoResponseDto;
@@ -142,5 +143,15 @@ public class VideoController {
             @RequestBody(required = false) VideoAnalyzeRequestDto request
     ) {
         return Map.of("data", videoAnalysisService.startAnalysis(videoId, request));
+    }
+
+    //영상 분석 작업 상태 조회
+    @GetMapping("/{videoId}/analyze/jobs/{jobId}")
+    @ResponseStatus(HttpStatus.OK)
+    public Map<String, VideoAnalysisJobStatusDto> getAnalysisJobStatus(
+            @PathVariable Long videoId,
+            @PathVariable String jobId
+    ) {
+        return Map.of("data", videoAnalysisService.getJobStatus(videoId, jobId));
     }
 }
