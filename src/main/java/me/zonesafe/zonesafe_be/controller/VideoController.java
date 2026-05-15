@@ -5,6 +5,7 @@ import me.zonesafe.zonesafe_be.dto.PageResponseDto;
 import me.zonesafe.zonesafe_be.dto.VideoAnalysisJobStatusDto;
 import me.zonesafe.zonesafe_be.dto.VideoAnalyzeJobResponseDto;
 import me.zonesafe.zonesafe_be.dto.VideoAnalyzeRequestDto;
+import me.zonesafe.zonesafe_be.dto.VideoEventResponseDto;
 import me.zonesafe.zonesafe_be.dto.VideoResponseDto;
 import me.zonesafe.zonesafe_be.enums.VideoStatus;
 import me.zonesafe.zonesafe_be.service.VideoAnalysisService;
@@ -153,5 +154,12 @@ public class VideoController {
             @PathVariable String jobId
     ) {
         return Map.of("data", videoAnalysisService.getJobStatus(videoId, jobId));
+    }
+
+    //영상 내 탐지 이벤트 목록
+    @GetMapping("/{videoId}/events")
+    @ResponseStatus(HttpStatus.OK)
+    public Map<String, List<VideoEventResponseDto>> getEvents(@PathVariable Long videoId) {
+        return Map.of("data", videoAnalysisService.getEventsByVideoId(videoId));
     }
 }

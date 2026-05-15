@@ -1,20 +1,26 @@
 package me.zonesafe.zonesafe_be.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.domain.Video;
+import me.zonesafe.zonesafe_be.domain.VideoAnalysisEvent;
 import me.zonesafe.zonesafe_be.domain.VideoAnalysisJob;
 import me.zonesafe.zonesafe_be.dto.VideoAnalysisJobStatusDto;
 import me.zonesafe.zonesafe_be.dto.VideoAnalyzeJobResponseDto;
 import me.zonesafe.zonesafe_be.dto.VideoAnalyzeRequestDto;
+import me.zonesafe.zonesafe_be.dto.VideoEventResponseDto;
 import me.zonesafe.zonesafe_be.enums.AnalysisJobStatus;
+import me.zonesafe.zonesafe_be.repository.VideoAnalysisEventRepository;
 import me.zonesafe.zonesafe_be.repository.VideoAnalysisJobRepository;
 import me.zonesafe.zonesafe_be.repository.VideoRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +28,41 @@ import java.util.UUID;
 public class VideoAnalysisService {
     private final VideoRepository videoRepository;
     private final VideoAnalysisJobRepository jobRepository;
+    private final VideoAnalysisEventRepository eventRepository;
     private final ObjectMapper objectMapper;
+
+    //영상 탐지 이벤트 목록
+    public List<VideoEventResponseDto> getEventsByVideoId(Long videoId) {
+        if (!videoRepository.existsById(videoId)) {
+            throw new IllegalArgumentException("해당 영상이 존재하지 않습니다. ID: " + videoId);
+        }
+        List<VideoAnalysisEvent> events = eventRepository.findAllByVideo_VideoIdOrderByFrameTimestampAsc(videoId);
+        return events.stream().map(this::convertToDto).collect(Collectors.toList());
+    }
+
+    private VideoEventResponseDto convertToDto(VideoAnalysisEvent event) {
+        VideoEventResponseDto dto = new VideoEventResponseDto();
+        dto.setEventId(event.getEventId());
+        dto.setVideoId(event.getVideo().getVideoId());
+        dto.setFrameTimestamp(event.getFrameTimestamp());
+        dto.setSeverity(event.getSeverity());
+        dto.setType(event.getType());
+        dto.setRoiId(event.getRoiId());
+        dto.setClipId(event.getClipId());
+        dto.setOccurredAt(event.getOccurredAt());
+        dto.setDetections(parseDetections(event.getDetectionsJson()));
+        return dto;
+    }
+
+    private List<VideoEventResponseDto.DetectionDto> parseDetections(String detectionsJson) {
+        if (detectionsJson == null || detectionsJson.isBlank()) return null;
+        try {
+            return objectMapper.readValue(detectionsJson,
+                    new TypeReference<List<VideoEventResponseDto.DetectionDto>>() {});
+        } catch (JsonProcessingException e) {
+            return null;
+        }
+    }
 
     //분석 작업 상태 조회
     public VideoAnalysisJobStatusDto getJobStatus(Long videoId, String jobId) {
