@@ -48,6 +48,32 @@ public class VideoService {
         return convertToDto(video);
     }
 
+    //영상 삭제
+    @Transactional
+    public void deleteVideo(Long videoId) {
+        Video video = videoRepository.findById(videoId)
+                .orElseThrow(() -> new IllegalArgumentException("삭제하려는 영상이 존재하지 않습니다. ID: " + videoId));
+
+        //TODO: 영상 분석으로 생성된 클립(generatedClipIds)도 함께 삭제
+        deleteFileQuietly(video.getFilePath());
+        deleteFileQuietly(video.getThumbnailPath());
+
+        videoRepository.delete(video);
+    }
+
+    private void deleteFileQuietly(String storedPath) {
+        if (storedPath == null || storedPath.isBlank()) return;
+        try {
+            Files.deleteIfExists(resolvePath(storedPath));
+        } catch (IOException ignored) {
+        }
+    }
+
+    private Path resolvePath(String storedPath) {
+        Path stored = Paths.get(storedPath);
+        return stored.isAbsolute() ? stored : Paths.get(basePath).resolve(storedPath).normalize();
+    }
+
     //영상 업로드
     @Transactional
     public VideoResponseDto uploadVideo(MultipartFile file,

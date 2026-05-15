@@ -61,4 +61,11 @@ public class VideoController {
     public Map<String, VideoResponseDto> getVideoById(@PathVariable Long videoId) {
         return Map.of("data", videoService.getVideoById(videoId));
     }
+
+    //영상 삭제 (TODO: Spring Security 도입 후 @PreAuthorize 로 ADMIN 또는 소유자 검증)
+    @DeleteMapping("/{videoId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteVideo(@PathVariable Long videoId) {
+        videoService.deleteVideo(videoId);
+    }
 }
