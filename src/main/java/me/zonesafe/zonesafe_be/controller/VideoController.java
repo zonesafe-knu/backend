@@ -5,17 +5,24 @@ import me.zonesafe.zonesafe_be.dto.PageResponseDto;
 import me.zonesafe.zonesafe_be.dto.VideoResponseDto;
 import me.zonesafe.zonesafe_be.enums.VideoStatus;
 import me.zonesafe.zonesafe_be.service.VideoService;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpRange;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -67,5 +74,59 @@ public class VideoController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteVideo(@PathVariable Long videoId) {
         videoService.deleteVideo(videoId);
+    }
+
+    //영상 다운로드
+    @GetMapping("/{videoId}/download")
+    public ResponseEntity<Resource> downloadVideo(@PathVariable Long videoId) {
+        Resource resource = videoService.loadVideoResource(videoId);
+        String filename = "video_" + videoId + ".mp4";
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(resource);
+    }
+
+    //영상 스트리밍 (Range Request 지원)
+    private static final long STREAM_CHUNK_SIZE = 1024L * 1024L;
+
+    @GetMapping("/{videoId}/stream")
+    public ResponseEntity<ResourceRegion> streamVideo(
+            @PathVariable Long videoId,
+            @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader
+    ) throws IOException {
+        Resource resource = videoService.loadVideoResource(videoId);
+        long contentLength = resource.contentLength();
+
+        ResourceRegion region;
+        HttpStatus status;
+        if (rangeHeader == null || rangeHeader.isBlank()) {
+            long rangeLength = Math.min(STREAM_CHUNK_SIZE, contentLength);
+            region = new ResourceRegion(resource, 0, rangeLength);
+            status = HttpStatus.OK;
+        } else {
+            List<HttpRange> ranges = HttpRange.parseRanges(rangeHeader);
+            HttpRange range = ranges.get(0);
+            long start = range.getRangeStart(contentLength);
+            long end = range.getRangeEnd(contentLength);
+            long rangeLength = Math.min(STREAM_CHUNK_SIZE, end - start + 1);
+            region = new ResourceRegion(resource, start, rangeLength);
+            status = HttpStatus.PARTIAL_CONTENT;
+        }
+
+        return ResponseEntity.status(status)
+                .contentType(MediaType.valueOf("video/mp4"))
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .body(region);
+    }
+
+    //영상 썸네일
+    @GetMapping("/{videoId}/thumbnail")
+    public ResponseEntity<Resource> getThumbnail(@PathVariable Long videoId) {
+        Resource resource = videoService.loadThumbnailResource(videoId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_JPEG)
+                .body(resource);
     }
 }

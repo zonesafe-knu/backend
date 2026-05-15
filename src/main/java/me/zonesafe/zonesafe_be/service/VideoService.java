@@ -7,6 +7,8 @@ import me.zonesafe.zonesafe_be.enums.VideoStatus;
 import me.zonesafe.zonesafe_be.repository.VideoRepository;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -46,6 +48,36 @@ public class VideoService {
         Video video = videoRepository.findById(videoId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 영상이 존재하지 않습니다. ID: " + videoId));
         return convertToDto(video);
+    }
+
+    //영상 파일 리소스 조회 (스트리밍/다운로드용)
+    public Resource loadVideoResource(Long videoId) {
+        Video video = videoRepository.findById(videoId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 영상이 존재하지 않습니다. ID: " + videoId));
+
+        Path path = resolvePath(video.getFilePath());
+        FileSystemResource resource = new FileSystemResource(path);
+        if (!resource.exists()) {
+            throw new IllegalArgumentException("영상 파일이 존재하지 않습니다. ID: " + videoId);
+        }
+        return resource;
+    }
+
+    //영상 썸네일 리소스 조회
+    public Resource loadThumbnailResource(Long videoId) {
+        Video video = videoRepository.findById(videoId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 영상이 존재하지 않습니다. ID: " + videoId));
+
+        if (video.getThumbnailPath() == null || video.getThumbnailPath().isBlank()) {
+            throw new IllegalArgumentException("해당 영상의 썸네일이 없습니다. ID: " + videoId);
+        }
+
+        Path path = resolvePath(video.getThumbnailPath());
+        FileSystemResource resource = new FileSystemResource(path);
+        if (!resource.exists()) {
+            throw new IllegalArgumentException("썸네일 파일이 존재하지 않습니다. ID: " + videoId);
+        }
+        return resource;
     }
 
     //영상 삭제
