@@ -7,6 +7,8 @@ import me.zonesafe.zonesafe_be.enums.VideoStatus;
 import me.zonesafe.zonesafe_be.repository.VideoRepository;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,6 +17,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.ZonedDateTime;
 import java.util.UUID;
 
 @Service
@@ -26,6 +29,24 @@ public class VideoService {
 
     @Value("${videos.storage.base-path}")
     private String basePath;
+
+    //영상 목록 조회
+    public Page<VideoResponseDto> getVideos(VideoStatus status,
+                                            Long siteId,
+                                            String uploadedBy,
+                                            ZonedDateTime from,
+                                            ZonedDateTime to,
+                                            Pageable pageable) {
+        Page<Video> videos = videoRepository.findAllByFilter(status, siteId, uploadedBy, from, to, pageable);
+        return videos.map(this::convertToDto);
+    }
+
+    //영상 상세 조회
+    public VideoResponseDto getVideoById(Long videoId) {
+        Video video = videoRepository.findById(videoId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 영상이 존재하지 않습니다. ID: " + videoId));
+        return convertToDto(video);
+    }
 
     //영상 업로드
     @Transactional
