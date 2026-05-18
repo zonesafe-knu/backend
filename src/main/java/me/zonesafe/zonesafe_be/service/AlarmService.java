@@ -5,11 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.domain.Alarm;
 import me.zonesafe.zonesafe_be.domain.AlarmSpecification;
+import me.zonesafe.zonesafe_be.domain.Camera;
+import me.zonesafe.zonesafe_be.dto.AlarmCreateRequest;
+import me.zonesafe.zonesafe_be.dto.AlarmEvent;
 import me.zonesafe.zonesafe_be.dto.AlarmResponseDto;
 import me.zonesafe.zonesafe_be.enums.AlarmSeverity;
 import me.zonesafe.zonesafe_be.enums.AlarmStatus;
 import me.zonesafe.zonesafe_be.enums.AlarmType;
 import me.zonesafe.zonesafe_be.repository.AlarmRepository;
+import me.zonesafe.zonesafe_be.repository.CameraRepository;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
@@ -30,8 +34,45 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class AlarmService {
     private final AlarmRepository alarmRepository;
+    private final CameraRepository cameraRepository;
     private final ModelMapper modelMapper;
     private final ObjectMapper objectMapper;
+    private final AlarmEventPublisher alarmEventPublisher;
+
+    @Transactional
+    public AlarmResponseDto createAlarm(AlarmCreateRequest request) {
+        Camera camera = cameraRepository.findById(request.getCameraId())
+                .orElseThrow(() -> new RuntimeException("해당 카메라를 찾을 수 없습니다. ID: " + request.getCameraId()));
+
+        Alarm alarm = new Alarm();
+        alarm.setCamera(camera);
+        alarm.setSeverity(request.getSeverity());
+        alarm.setType(request.getType());
+        alarm.setStatus(AlarmStatus.NEW);
+        alarm.setMessage(request.getMessage());
+        alarm.setDetectionsJson(request.getDetectionsJson());
+        alarm.setClipId(request.getClipId());
+        alarm.setOccurredAt(request.getOccurredAt() != null ? request.getOccurredAt() : ZonedDateTime.now());
+
+        Alarm saved = alarmRepository.save(alarm);
+
+        AlarmEvent event = AlarmEvent.builder()
+                .alarmId(saved.getAlarmId())
+                .cameraId(camera.getCameraId())
+                .roiId(request.getRoiId())
+                .severity(saved.getSeverity())
+                .type(saved.getType())
+                .message(saved.getMessage())
+                .snapshotUrl(request.getSnapshotUrl())
+                .occurredAt(saved.getOccurredAt())
+                .build();
+        alarmEventPublisher.publish(event);
+
+        AlarmResponseDto dto = convertToDto(saved);
+        dto.setRoiId(request.getRoiId());
+        dto.setSnapshotUrl(request.getSnapshotUrl());
+        return dto;
+    }
 
     public Page<AlarmResponseDto> getAlarms(
             Long cameraId, AlarmSeverity severity,
