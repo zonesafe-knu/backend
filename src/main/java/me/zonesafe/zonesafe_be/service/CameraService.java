@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.domain.Camera;
 import me.zonesafe.zonesafe_be.dto.CameraRequestDto;
 import me.zonesafe.zonesafe_be.dto.CameraResponseDto;
+import me.zonesafe.zonesafe_be.dto.CameraStatusEvent;
+import me.zonesafe.zonesafe_be.dto.CameraStatusUpdateRequest;
 import me.zonesafe.zonesafe_be.dto.StreamResponseDto;
 import me.zonesafe.zonesafe_be.enums.CameraStatus;
 import me.zonesafe.zonesafe_be.repository.CameraRepository;
@@ -11,6 +13,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,6 +23,7 @@ import java.util.stream.Collectors;
 public class CameraService {
     private final CameraRepository cameraRepository;
     private final ModelMapper modelMapper;
+    private final CameraEventPublisher cameraEventPublisher;
 
     //카메라 조회
     public List<CameraResponseDto> getCameras(Long siteId, CameraStatus status) {
@@ -81,6 +85,8 @@ public class CameraService {
         Camera camera = cameraRepository.findById(cameraId)
                 .orElseThrow(()->new IllegalArgumentException("수정하려는 카메라가 존재하지 않습니다. ID: " + cameraId));
 
+        CameraStatus previousStatus = camera.getStatus();
+
         //정보 수정
         camera.setName(cameraRequestDto.getName());
         camera.setRtspUrl(cameraRequestDto.getRtspUrl());
@@ -89,6 +95,42 @@ public class CameraService {
         camera.setResolution(cameraRequestDto.getResolution());
         camera.setFps(cameraRequestDto.getFps());
         camera.setStatus(cameraRequestDto.getStatus());
+
+        if (cameraRequestDto.getStatus() != null && cameraRequestDto.getStatus() != previousStatus) {
+            publishStatusEvent(camera);
+        }
+    }
+
+    //카메라 상태 단독 업데이트 (heartbeat / AI 파이프라인 등 내부 호출용)
+    @Transactional
+    public CameraResponseDto updateCameraStatus(Long cameraId, CameraStatusUpdateRequest request) {
+        Camera camera = cameraRepository.findById(cameraId)
+                .orElseThrow(() -> new IllegalArgumentException("카메라를 찾을 수 없습니다. ID: " + cameraId));
+
+        CameraStatus previousStatus = camera.getStatus();
+        if (request.getStatus() != null) {
+            camera.setStatus(request.getStatus());
+        }
+        if (request.getLastHeartbeat() != null) {
+            camera.setLastHeartbeat(request.getLastHeartbeat());
+        }
+
+        boolean statusChanged = request.getStatus() != null && request.getStatus() != previousStatus;
+        if (statusChanged) {
+            publishStatusEvent(camera);
+        }
+
+        return modelMapper.map(camera, CameraResponseDto.class);
+    }
+
+    private void publishStatusEvent(Camera camera) {
+        CameraStatusEvent event = CameraStatusEvent.builder()
+                .cameraId(camera.getCameraId())
+                .status(camera.getStatus())
+                .lastHeartbeat(camera.getLastHeartbeat())
+                .changedAt(ZonedDateTime.now())
+                .build();
+        cameraEventPublisher.publishStatus(event);
     }
 
     public StreamResponseDto getStreamUrl(Long cameraId) {

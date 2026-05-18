@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>웹소켓 실시간 알람 테스트</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body style="font-family: sans-serif; padding: 20px;">
+
+<h2>🚨 실시간 알람 수신 테스트</h2>
+<button onclick="connect()" style="padding: 10px; font-size: 16px; cursor: pointer;">
+    1. 서버 연결 및 구독하기
+</button>
+
+<div id="messages" style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; background: #f9f9f9; min-height: 200px;">
+</div>
+
+<script>
+    let stompClient = null;
+
+    function connect() {
+        // 1. 순수 웹소켓 객체 생성 (팀장님 서버 주소)
+        let socket = new WebSocket('ws://localhost:8080/ws');
+
+        // 2. 그 위에 STOMP 프로토콜 얹기
+        stompClient = Stomp.over(socket);
+
+        // 3. 서버에 연결 시도
+        stompClient.connect({}, function (frame) {
+            console.log('Connected: ' + frame);
+            document.getElementById('messages').innerHTML += '<p style="color: blue;">✅ 서버 연결 성공! /topic/alarms 구독 시작...</p>';
+
+            // 4. 특정 토픽(경로) 구독하기
+            stompClient.subscribe('/topic/alarms', function (message) {
+                console.log("알람 수신: ", message.body);
+                let alarmData = JSON.parse(message.body);
+
+                // 수신된 데이터를 화면에 예쁘게 출력
+                let text = `<p style="color: red;"><b>[새로운 알람!]</b> ${alarmData.message} (카메라ID: ${alarmData.cameraId})</p>`;
+                document.getElementById('messages').innerHTML += text;
+            });
+        }, function(error) {
+            document.getElementById('messages').innerHTML += '<p style="color:red">❌ 연결 실패: ' + error + '</p>';
+        });
+    }
+</script>
+</body>
+</html>
