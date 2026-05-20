@@ -8,7 +8,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/rois")
@@ -19,8 +18,8 @@ public class RoiController {
     //ROI 목록 조회
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public Map<String, List<RoiResponseDto>> getRois(@RequestParam(required = false) Long cameraId) {
-        return Map.of("data", roiService.getRois(cameraId));
+    public List<RoiResponseDto> getRois(@RequestParam(required = false) Long cameraId) {
+        return roiService.getRois(cameraId);
     }
 
     //ROI 상세 조회

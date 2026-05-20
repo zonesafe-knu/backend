@@ -11,7 +11,7 @@ import java.util.List;
 
 public class AlarmSpecification {
     public static Specification<Alarm> filterAlarms(
-            Long cameraId, AlarmSeverity severity,
+            Long cameraId, Long roiId, AlarmSeverity severity,
             AlarmType type, AlarmStatus status,
             ZonedDateTime from, ZonedDateTime to) {
 
@@ -21,6 +21,7 @@ public class AlarmSpecification {
             if (cameraId != null) {
                 predicates.add(criteriaBuilder.equal(root.get("camera").get("cameraId"), cameraId));
             }
+            if (roiId != null) predicates.add(criteriaBuilder.equal(root.get("roiId"), roiId));
             if (severity != null) predicates.add(criteriaBuilder.equal(root.get("severity"), severity));
             if (type != null) predicates.add(criteriaBuilder.equal(root.get("type"), type));
             if (status != null) predicates.add(criteriaBuilder.equal(root.get("status"), status));

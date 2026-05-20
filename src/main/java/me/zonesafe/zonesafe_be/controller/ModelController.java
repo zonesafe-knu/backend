@@ -10,7 +10,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 // TODO: Spring Security 도입 후 @PreAuthorize("hasRole('ADMIN')") 적용
 @RestController
@@ -22,8 +21,8 @@ public class ModelController {
     //모델 목록
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public Map<String, List<ModelResponseDto>> getModels() {
-        return Map.of("data", modelService.getModels());
+    public List<ModelResponseDto> getModels() {
+        return modelService.getModels();
     }
 
     //활성 모델 변경
@@ -44,14 +43,14 @@ public class ModelController {
     //오토 라벨링 작업 생성
     @PostMapping("/auto-label")
     @ResponseStatus(HttpStatus.CREATED)
-    public Map<String, AutoLabelJobResponseDto> createAutoLabelJob(@RequestBody AutoLabelRequestDto request) {
-        return Map.of("data", modelService.createAutoLabelJob(request));
+    public AutoLabelJobResponseDto createAutoLabelJob(@RequestBody AutoLabelRequestDto request) {
+        return modelService.createAutoLabelJob(request);
     }
 
     //오토 라벨링 작업 상태 조회
     @GetMapping("/auto-label/jobs/{jobId}")
     @ResponseStatus(HttpStatus.OK)
-    public Map<String, AutoLabelJobResponseDto> getAutoLabelJob(@PathVariable String jobId) {
-        return Map.of("data", modelService.getAutoLabelJob(jobId));
+    public AutoLabelJobResponseDto getAutoLabelJob(@PathVariable String jobId) {
+        return modelService.getAutoLabelJob(jobId);
     }
 }

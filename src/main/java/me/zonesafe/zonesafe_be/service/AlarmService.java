@@ -46,6 +46,7 @@ public class AlarmService {
 
         Alarm alarm = new Alarm();
         alarm.setCamera(camera);
+        alarm.setRoiId(request.getRoiId());
         alarm.setSeverity(request.getSeverity());
         alarm.setType(request.getType());
         alarm.setStatus(AlarmStatus.NEW);
@@ -69,17 +70,16 @@ public class AlarmService {
         alarmEventPublisher.publish(event);
 
         AlarmResponseDto dto = convertToDto(saved);
-        dto.setRoiId(request.getRoiId());
         dto.setSnapshotUrl(request.getSnapshotUrl());
         return dto;
     }
 
     public Page<AlarmResponseDto> getAlarms(
-            Long cameraId, AlarmSeverity severity,
+            Long cameraId, Long roiId, AlarmSeverity severity,
             AlarmType type, AlarmStatus status,
             ZonedDateTime from, ZonedDateTime to, Pageable pageable) {
 
-        Specification<Alarm> spec = AlarmSpecification.filterAlarms(cameraId, severity, type, status, from, to);
+        Specification<Alarm> spec = AlarmSpecification.filterAlarms(cameraId, roiId, severity, type, status, from, to);
         Page<Alarm> alarms = alarmRepository.findAll(spec, pageable);
 
         return alarms.map(this::convertToDto);

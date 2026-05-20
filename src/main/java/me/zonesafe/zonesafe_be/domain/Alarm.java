@@ -25,10 +25,9 @@ public class Alarm {
     @JoinColumn(name = "camera_id", nullable = false)
     private Camera camera;
 
-//    // 외래키 설정 2: Roi 참조 (nullable, 명세서 반영)
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "roi_id")
-//    private Roi roi;
+    // ROI 참조 (nullable). 명세서 §12 Alarm.roiId 반영 — FK 제약 없이 단순 컬럼으로 보관.
+    @Column(name = "roi_id")
+    private Long roiId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
