@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>ZoneSafe WebSocket 통합 테스트</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 20px; max-width: 1100px; margin: 0 auto; background: #fafafa; color: #222; }
+        h2 { margin-top: 0; }
+        h3 { margin-bottom: 8px; }
+        .panel { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+        .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+        button { padding: 8px 14px; font-size: 14px; cursor: pointer; border: 1px solid #888; background: #fff; border-radius: 4px; }
+        button:hover { background: #f0f0f0; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+        button.danger { background: #dc2626; color: #fff; border-color: #dc2626; }
+        button.warn { background: #d97706; color: #fff; border-color: #d97706; }
+        input, select { padding: 6px 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+        .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #aaa; margin-right: 6px; vertical-align: middle; }
+        .status-dot.connected { background: #16a34a; }
+        .log { background: #1e1e1e; color: #e4e4e4; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; padding: 12px; height: 320px; overflow-y: auto; border-radius: 4px; white-space: pre-wrap; word-break: break-all; }
+        .log .line { margin-bottom: 4px; }
+        .log .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; margin-right: 6px; font-weight: bold; }
+        .tag.SYS    { background: #4b5563; color: #fff; }
+        .tag.ALARM  { background: #dc2626; color: #fff; }
+        .tag.ALARM-CAM { background: #ea580c; color: #fff; }
+        .tag.CAM    { background: #0ea5e9; color: #fff; }
+        .tag.DET    { background: #16a34a; color: #fff; }
+        .tag.ACK    { background: #7c3aed; color: #fff; }
+        .tag.ERR    { background: #000; color: #fff; }
+        small { color: #666; }
+    </style>
+</head>
+<body>
+
+<h2>🛰️ ZoneSafe WebSocket 통합 테스트</h2>
+
+<div class="panel">
+    <h3>연결</h3>
+    <div class="row">
+        <span><span id="status-dot" class="status-dot"></span><span id="status-text">Disconnected</span></span>
+        <label>cameraId <input id="cameraId" type="number" value="1" style="width: 70px;"></label>
+        <button id="btnConnect" class="primary" onclick="connect()">Connect & Subscribe</button>
+        <button id="btnDisconnect" onclick="disconnect()" disabled>Disconnect</button>
+        <button onclick="clearLog()">Clear log</button>
+    </div>
+    <small>구독: <code>/topic/alarms</code>, <code>/topic/alarms/camera/{cameraId}</code>, <code>/topic/cameras/{cameraId}/status</code>, <code>/topic/detections/{cameraId}</code></small>
+</div>
+
+<div class="panel">
+    <h3>트리거 액션 (HTTP)</h3>
+    <div class="row">
+        <button class="danger" onclick="triggerAlarm()">① 알람 생성 POST</button>
+        <button class="warn" onclick="toggleCameraStatus()">② 카메라 상태 토글 PATCH</button>
+        <button onclick="sendDetectionFrame()">③ 탐지 프레임 발행 POST</button>
+        <button class="primary" onclick="sendAck()" id="btnAck" disabled>④ 최근 알람 ACK (WS)</button>
+    </div>
+    <small>마지막으로 수신한 alarmId: <b id="lastAlarmId">없음</b></small>
+</div>
+
+<div class="panel">
+    <h3>메시지 로그</h3>
+    <div id="log" class="log"></div>
+</div>
+
+<script>
+let stompClient = null;
+let lastAlarmId = null;
+let cameraStatusToggle = "ONLINE";
+
+function cameraId() {
+    return parseInt(document.getElementById("cameraId").value || "1", 10);
+}
+
+function log(tag, text) {
+    const el = document.getElementById("log");
+    const time = new Date().toLocaleTimeString();
+    const line = document.createElement("div");
+    line.className = "line";
+    line.innerHTML = `<span class="tag ${tag}">${tag}</span><span>[${time}]</span> ${escapeHtml(text)}`;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+
+function clearLog() {
+    document.getElementById("log").innerHTML = "";
+}
+
+function setConnectedUI(connected) {
+    document.getElementById("status-dot").classList.toggle("connected", connected);
+    document.getElementById("status-text").textContent = connected ? "Connected" : "Disconnected";
+    document.getElementById("btnConnect").disabled = connected;
+    document.getElementById("btnDisconnect").disabled = !connected;
+}
+
+function connect() {
+    const camId = cameraId();
+    const socket = new WebSocket("ws://localhost:8080/ws");
+    stompClient = Stomp.over(socket);
+    stompClient.debug = null;  // 콘솔 STOMP 로그 끔
+
+    stompClient.connect({}, frame => {
+        setConnectedUI(true);
+        log("SYS", "Connected: " + frame.headers["server"]);
+
+        stompClient.subscribe("/topic/alarms", msg => {
+            const data = JSON.parse(msg.body);
+            lastAlarmId = data.alarmId;
+            document.getElementById("lastAlarmId").textContent = data.alarmId;
+            document.getElementById("btnAck").disabled = false;
+            log("ALARM", JSON.stringify(data));
+        });
+
+        stompClient.subscribe(`/topic/alarms/camera/${camId}`, msg => {
+            log("ALARM-CAM", msg.body);
+        });
+
+        stompClient.subscribe(`/topic/cameras/${camId}/status`, msg => {
+            log("CAM", msg.body);
+        });
+
+        stompClient.subscribe(`/topic/detections/${camId}`, msg => {
+            log("DET", msg.body);
+        });
+
+        log("SYS", `Subscribed to 4 topics (cameraId=${camId})`);
+    }, err => {
+        log("ERR", "Connection failed: " + err);
+        setConnectedUI(false);
+    });
+}
+
+function disconnect() {
+    if (stompClient) {
+        stompClient.disconnect(() => {
+            log("SYS", "Disconnected");
+            setConnectedUI(false);
+        });
+    }
+}
+
+async function triggerAlarm() {
+    const camId = cameraId();
+    const body = {
+        cameraId: camId,
+        roiId: 10,
+        severity: "DANGER",
+        type: "WORKER_FORKLIFT_PROXIMITY",
+        message: `작업자-지게차 근접 (거리 ${Math.floor(Math.random() * 100)}px)`,
+        snapshotUrl: "https://example.com/snap.jpg"
+    };
+    try {
+        const res = await fetch("/api/v1/internal/alarms", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        log("SYS", `POST /internal/alarms → ${res.status} alarmId=${data.alarmId}`);
+    } catch (e) {
+        log("ERR", "Failed to create alarm: " + e.message);
+    }
+}
+
+async function toggleCameraStatus() {
+    const camId = cameraId();
+    cameraStatusToggle = (cameraStatusToggle === "ONLINE") ? "OFFLINE" : "ONLINE";
+    const body = {
+        status: cameraStatusToggle,
+        lastHeartbeat: new Date().toISOString()
+    };
+    try {
+        const res = await fetch(`/api/v1/internal/cameras/${camId}/status`, {
+            method: "PATCH",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(body)
+        });
+        log("SYS", `PATCH /internal/cameras/${camId}/status → ${res.status} (sent ${cameraStatusToggle})`);
+    } catch (e) {
+        log("ERR", "Failed to update camera status: " + e.message);
+    }
+}
+
+async function sendDetectionFrame() {
+    const camId = cameraId();
+    const body = {
+        cameraId: camId,
+        frameTs: new Date().toISOString(),
+        objects: [
+            { trackId: 17, label: "worker",   bbox: [340,210,420,470], confidence: 0.91 },
+            { trackId: 33, label: "forklift", bbox: [430,250,610,500], confidence: 0.94 }
+        ]
+    };
+    try {
+        const res = await fetch("/api/v1/internal/detections/frame", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(body)
+        });
+        log("SYS", `POST /internal/detections/frame → ${res.status}`);
+    } catch (e) {
+        log("ERR", "Failed to send detection frame: " + e.message);
+    }
+}
+
+function sendAck() {
+    if (!stompClient || !lastAlarmId) {
+        log("ERR", "ACK 보낼 알람이 없음 (먼저 알람을 생성하세요)");
+        return;
+    }
+    stompClient.send("/app/ack", {}, JSON.stringify({ alarmId: lastAlarmId }));
+    log("ACK", `SEND /app/ack { alarmId: ${lastAlarmId} }`);
+}
+</script>
+
+</body>
+</html>
