@@ -25,7 +25,7 @@ public class Alarm {
     @JoinColumn(name = "camera_id", nullable = false)
     private Camera camera;
 
-    // ROI 참조 (nullable). 명세서 §12 Alarm.roiId 반영 — FK 제약 없이 단순 컬럼으로 보관.
+    // ROI 참조 (nullable)
     @Column(name = "roi_id")
     private Long roiId;
 
@@ -47,6 +47,9 @@ public class Alarm {
     private String detectionsJson; // 명세서의 json 타입 반영 (String으로 우선 매핑)
 
     private Long clipId; // nullable
+
+    @Column(length = 500)
+    private String snapshotUrl;
 
     @Column(length = 500)
     private String comment;

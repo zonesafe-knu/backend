@@ -14,6 +14,7 @@ import me.zonesafe.zonesafe_be.enums.AlarmStatus;
 import me.zonesafe.zonesafe_be.enums.AlarmType;
 import me.zonesafe.zonesafe_be.repository.AlarmRepository;
 import me.zonesafe.zonesafe_be.repository.CameraRepository;
+import me.zonesafe.zonesafe_be.repository.RoiRepository;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
@@ -35,6 +36,7 @@ import java.util.List;
 public class AlarmService {
     private final AlarmRepository alarmRepository;
     private final CameraRepository cameraRepository;
+    private final RoiRepository roiRepository;
     private final ModelMapper modelMapper;
     private final ObjectMapper objectMapper;
     private final AlarmEventPublisher alarmEventPublisher;
@@ -53,6 +55,7 @@ public class AlarmService {
         alarm.setMessage(request.getMessage());
         alarm.setDetectionsJson(request.getDetectionsJson());
         alarm.setClipId(request.getClipId());
+        alarm.setSnapshotUrl(request.getSnapshotUrl());
         alarm.setOccurredAt(request.getOccurredAt() != null ? request.getOccurredAt() : ZonedDateTime.now());
 
         Alarm saved = alarmRepository.save(alarm);
@@ -69,9 +72,7 @@ public class AlarmService {
                 .build();
         alarmEventPublisher.publish(event);
 
-        AlarmResponseDto dto = convertToDto(saved);
-        dto.setSnapshotUrl(request.getSnapshotUrl());
-        return dto;
+        return convertToDto(saved);
     }
 
     public Page<AlarmResponseDto> getAlarms(
@@ -130,8 +131,12 @@ public class AlarmService {
         dto.setCameraId(alarm.getCamera().getCameraId());
         dto.setCameraName(alarm.getCamera().getName());
 
-        //ROI 세팅 추가
-        //snapshop 추가
+        dto.setSnapshotUrl(alarm.getSnapshotUrl());
+
+        if (alarm.getRoiId() != null) {
+            roiRepository.findById(alarm.getRoiId())
+                    .ifPresent(roi -> dto.setRoiName(roi.getName()));
+        }
 
         //JSON 문자열 -> List<DetectionDto> 변환
         if (alarm.getDetectionsJson() != null && !alarm.getDetectionsJson().isEmpty()) {
