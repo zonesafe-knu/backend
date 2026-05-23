@@ -9,8 +9,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 
 public interface VideoRepository extends JpaRepository<Video, Long> {
+
+    List<Video> findAllByCameraContext(Long cameraContext);
+
     @Query("SELECT v FROM Video v WHERE " +
             "(:status IS NULL OR v.status = :status) AND " +
             "(:siteId IS NULL OR v.siteId = :siteId) AND " +
