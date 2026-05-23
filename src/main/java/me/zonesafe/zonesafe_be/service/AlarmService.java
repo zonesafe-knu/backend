@@ -9,6 +9,7 @@ import me.zonesafe.zonesafe_be.domain.Camera;
 import me.zonesafe.zonesafe_be.dto.AlarmCreateRequest;
 import me.zonesafe.zonesafe_be.dto.AlarmEvent;
 import me.zonesafe.zonesafe_be.dto.AlarmResponseDto;
+import me.zonesafe.zonesafe_be.dto.AlarmStatusChangedEvent;
 import me.zonesafe.zonesafe_be.enums.AlarmSeverity;
 import me.zonesafe.zonesafe_be.enums.AlarmStatus;
 import me.zonesafe.zonesafe_be.enums.AlarmType;
@@ -106,6 +107,13 @@ public class AlarmService {
 
         //Transaction 덕분에 .save(alarm)으로 DB에 자동으로 update
 
+        alarmEventPublisher.publishStatusChange(AlarmStatusChangedEvent.builder()
+                .alarmId(alarm.getAlarmId())
+                .status(newStatus)
+                .comment(comment)
+                .changedAt(ZonedDateTime.now())
+                .build());
+
         return convertToDto(alarm);
     }
 
@@ -114,12 +122,20 @@ public class AlarmService {
         //요청받은 ID 리스트에 해당하는 알람들을 DB에서 한번에 조회
         List<Alarm> alarms = alarmRepository.findAllById(alarmIds);
 
+        ZonedDateTime now = ZonedDateTime.now();
         //조회된 알람들의 상태를 모두 ACK로 변경
         for(Alarm alarm : alarms) {
             alarm.setStatus(AlarmStatus.ACK);
 
             // (선택) 일괄 처리 시 남길 기본 코멘트가 있다면 세팅
             alarm.setComment("일괄 확인(ACK) 처리됨");
+
+            alarmEventPublisher.publishStatusChange(AlarmStatusChangedEvent.builder()
+                    .alarmId(alarm.getAlarmId())
+                    .status(AlarmStatus.ACK)
+                    .comment(alarm.getComment())
+                    .changedAt(now)
+                    .build());
         }
 
         return alarms.size();
