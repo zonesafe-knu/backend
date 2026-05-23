@@ -57,12 +57,13 @@ public class VideoController {
     public PageResponseDto<VideoResponseDto> getVideos(
             @RequestParam(required = false) VideoStatus status,
             @RequestParam(required = false) Long siteId,
+            @RequestParam(required = false) Long cameraContext,
             @RequestParam(required = false) String uploadedBy,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime to,
             @PageableDefault(size = 20, sort = "uploadedAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        Page<VideoResponseDto> pageResult = videoService.getVideos(status, siteId, uploadedBy, from, to, pageable);
+        Page<VideoResponseDto> pageResult = videoService.getVideos(status, siteId, cameraContext, uploadedBy, from, to, pageable);
         return new PageResponseDto<>(pageResult);
     }
 

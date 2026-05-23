@@ -16,9 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
@@ -35,11 +37,12 @@ public class VideoService {
     //영상 목록 조회
     public Page<VideoResponseDto> getVideos(VideoStatus status,
                                             Long siteId,
+                                            Long cameraContext,
                                             String uploadedBy,
                                             ZonedDateTime from,
                                             ZonedDateTime to,
                                             Pageable pageable) {
-        Page<Video> videos = videoRepository.findAllByFilter(status, siteId, uploadedBy, from, to, pageable);
+        Page<Video> videos = videoRepository.findAllByFilter(status, siteId, cameraContext, uploadedBy, from, to, pageable);
         return videos.map(this::convertToDto);
     }
 
@@ -149,13 +152,17 @@ public class VideoService {
 
     private Path saveToStorage(MultipartFile file, String storedFilename) {
         try {
-            Path baseDir = Paths.get(basePath);
+            // Spring MultipartFile.transferTo(File) 는 상대 경로 해석이 구현/환경별로 갈리므로
+            // 절대 경로 + Files.copy(InputStream) 로 안정화.
+            Path baseDir = Paths.get(basePath).toAbsolutePath().normalize();
             Files.createDirectories(baseDir);
-            Path target = baseDir.resolve(storedFilename).normalize();
-            file.transferTo(target.toFile());
+            Path target = baseDir.resolve(storedFilename);
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+            }
             return target;
         } catch (IOException e) {
-            throw new IllegalStateException("영상 파일 저장에 실패했습니다.", e);
+            throw new IllegalStateException("영상 파일 저장에 실패했습니다: " + e.getMessage(), e);
         }
     }
 
