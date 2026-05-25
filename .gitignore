@@ -38,3 +38,13 @@ out/
 
 # 민감한 DB 정보가 담긴 설정 파일 Git 추적 제외
 /src/main/resources/application.properties
+
+# Storage (uploaded videos/clips)
+/storage/
+
+# Python
+detection/__pycache__/
+detection/*.pt
+detection/bus.jpg
+detection/package-lock.json
+detection/*_events.json
