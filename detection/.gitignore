@@ -1,0 +1,11 @@
+
+# Storage (uploaded videos/clips)
+/storage/
+
+# Python
+detection/__pycache__/
+detect
+  ion/*.pt
+detection/bus.jpg
+detection/package-lock.json
+detection/*_events.json
