@@ -17,6 +17,7 @@ import java.util.List;
 public class DetectionFrame {
     private Long cameraId;
     private ZonedDateTime frameTs;
+    private Double videoTimeSec;
     private List<DetectionObject> objects;
 
     @Getter
