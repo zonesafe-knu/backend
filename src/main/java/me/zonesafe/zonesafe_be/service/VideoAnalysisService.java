@@ -20,6 +20,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.annotation.PostConstruct;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
@@ -54,6 +56,16 @@ public class VideoAnalysisService {
     private String videosBasePath;
 
     private final ExecutorService detectionExecutor = Executors.newCachedThreadPool();
+
+    @PostConstruct
+    public void autoStartOnBoot() {
+        List<me.zonesafe.zonesafe_be.domain.Video> videos = videoRepository.findAll();
+        for (me.zonesafe.zonesafe_be.domain.Video video : videos) {
+            if (video.getCameraContext() == null) continue;
+            log.info("서버 시작 — 영상 자동 분석 시작: videoId={}, cameraContext={}", video.getVideoId(), video.getCameraContext());
+            startAnalysis(video.getVideoId(), null);
+        }
+    }
 
     //영상 탐지 이벤트 목록
     public List<VideoEventResponseDto> getEventsByVideoId(Long videoId) {
