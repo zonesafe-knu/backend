@@ -11,14 +11,25 @@ ZoneSafe YOLO Detection — 카메라 ROI 기반 위험구역 감지 스크립�
 
 import argparse
 import json
+import random
 import time
 from datetime import datetime, timezone
 
 import cv2
+import numpy as np
+import torch
 from ultralytics import YOLO
 
 from api_client import BackendClient
 from roi_checker import RoiChecker
+
+
+def fix_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 def parse_args():
@@ -35,6 +46,8 @@ def parse_args():
     parser.add_argument("--skip-frames", type=int, default=5, help="N 프레임마다 1번 분석 (기본: 5)")
     parser.add_argument("--roi-refresh", type=int, default=30, help="ROI 설정 갱신 주기 — 초 (백엔드 연동 시)")
     parser.add_argument("--alarm-cooldown", type=int, default=10, help="같은 ROI 알람 재전송 대기 시간 (초)")
+    parser.add_argument("--seed", type=int, default=None, help="랜덤 시드 (미지정 시 고정 안 함)")
+    parser.add_argument("--loop", action="store_true", help="영상 끝까지 분석 후 처음부터 반복")
     return parser.parse_args()
 
 
@@ -65,12 +78,13 @@ def build_detections(results, model) -> list[dict]:
 def main():
     args = parse_args()
 
+    if args.seed is not None:
+        fix_seed(args.seed)
     print(f"모델 로딩: {args.model}")
     model = YOLO(args.model)
 
     client = BackendClient(args.backend_url) if args.backend_url else None
 
-    # ROI 초기 로드
     if args.roi_json:
         rois = load_rois_from_file(args.roi_json)
     else:
@@ -91,10 +105,15 @@ def main():
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     is_file = total_frames > 0
+
     if is_file:
         print(f"영상 파일: {total_frames}프레임, {fps:.1f}fps, {total_frames / fps:.1f}초")
     else:
         print(f"실시간 스트림 연결됨 ({fps:.1f}fps)")
+
+    loop_mode = args.loop and is_file
+    if loop_mode:
+        print(f"반복 분석 모드 활성화 — 서버 종료 시까지 계속 분석")
 
     print(f"카메라 {args.camera_id} 탐지 시작 (매 {args.skip_frames}프레임 분석)")
 
@@ -102,11 +121,19 @@ def main():
     all_events: list[dict] = []
     frame_idx = 0
     last_roi_refresh = time.time()
+    loop_count = 0
 
     try:
-        while cap.isOpened():
+        while True:
             ret, frame = cap.read()
             if not ret:
+                if loop_mode:
+                    loop_count += 1
+                    print(f"\n--- 반복 {loop_count}회 완료, 처음부터 다시 분석 ---")
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    frame_idx = 0
+                    model.predictor = None
+                    continue
                 break
 
             frame_idx += 1
@@ -115,8 +142,7 @@ def main():
 
             now = time.time()
 
-            # 백엔드 연동 시 ROI 주기적 갱신 (실시간 스트림용)
-            if client and not is_file and (now - last_roi_refresh > args.roi_refresh):
+            if client and (now - last_roi_refresh > args.roi_refresh):
                 try:
                     rois = client.get_rois(args.camera_id)
                     roi_checker = RoiChecker(rois)
@@ -131,15 +157,14 @@ def main():
             if not detections:
                 continue
 
-            # 백엔드에 탐지 프레임 전송
             frame_ts = datetime.now(timezone.utc).isoformat()
+            video_time_sec = (frame_idx / fps) % (total_frames / fps) if is_file else None
             if client:
                 try:
-                    client.send_detection_frame(args.camera_id, frame_ts, detections)
+                    client.send_detection_frame(args.camera_id, frame_ts, detections, video_time_sec)
                 except Exception as e:
                     print(f"탐지 프레임 전송 실패: {e}")
 
-            # ROI 위험 판단
             alarms = roi_checker.check_danger(detections)
             for alarm in alarms:
                 roi_id = alarm["roiId"]
@@ -162,7 +187,6 @@ def main():
                 all_events.append(event)
                 print(f"  [{alarm['severity']}] {message}")
 
-                # 백엔드에 알람 전송
                 if client:
                     try:
                         client.create_alarm(
@@ -176,7 +200,6 @@ def main():
                     except Exception as e:
                         print(f"  알람 전송 실패: {e}")
 
-            # 진행률 (파일 분석 시)
             if is_file and frame_idx % (args.skip_frames * 100) == 0:
                 progress = frame_idx / total_frames * 100
                 print(f"  진행률: {progress:.0f}% ({frame_idx}/{total_frames})")
@@ -186,8 +209,7 @@ def main():
 
     print(f"\n분석 완료 — {len(all_events)}건 위험 이벤트 감지")
 
-    # 파일 분석인 경우 결과를 JSON으로 저장
-    if is_file and all_events:
+    if is_file and all_events and not loop_mode:
         result_path = args.source.rsplit(".", 1)[0] + "_events.json"
         with open(result_path, "w", encoding="utf-8") as f:
             json.dump(all_events, f, ensure_ascii=False, indent=2)
