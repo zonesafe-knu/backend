@@ -31,6 +31,7 @@ import java.util.UUID;
 public class VideoService {
     private final VideoRepository videoRepository;
     private final ModelMapper modelMapper;
+    private final VideoAnalysisService videoAnalysisService;
 
     @Value("${videos.storage.base-path}")
     private String basePath;
@@ -165,6 +166,11 @@ public class VideoService {
         video.setUploadedBy(uploadedBy);
 
         Video saved = videoRepository.save(video);
+
+        if (cameraContext != null) {
+            videoAnalysisService.startAnalysis(saved.getVideoId(), null);
+        }
+
         return convertToDto(saved);
     }
 
