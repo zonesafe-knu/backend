@@ -36,6 +36,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="ZoneSafe YOLO 위험구역 감지")
     parser.add_argument("--source", required=True, help="영상 소스 (mp4 파일 경로 또는 RTSP URL)")
     parser.add_argument("--camera-id", type=int, required=True, help="백엔드에 등록된 카메라 ID")
+    parser.add_argument("--video-id", type=int, default=None, help="업로드된 영상 ID (지정 시 알람 발생 시점 ±5초 클립 자동 저장)")
     parser.add_argument("--model", default="yolov8n.pt", help="YOLO 모델 파일 경로")
     parser.add_argument("--confidence", type=float, default=0.5, help="탐지 confidence 임계값")
 
@@ -196,6 +197,8 @@ def main():
                             alarm_type=alarm["type"],
                             message=message,
                             detections_json=json.dumps(detections),
+                            video_id=args.video_id,
+                            video_time_sec=video_time_sec,
                         )
                     except Exception as e:
                         print(f"  알람 전송 실패: {e}")

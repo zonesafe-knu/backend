@@ -43,6 +43,8 @@ class BackendClient:
         message: str,
         detections_json: str | None = None,
         snapshot_url: str | None = None,
+        video_id: int | None = None,
+        video_time_sec: float | None = None,
     ) -> dict:
         payload = {
             "cameraId": camera_id,
@@ -56,6 +58,10 @@ class BackendClient:
             payload["detectionsJson"] = detections_json
         if snapshot_url:
             payload["snapshotUrl"] = snapshot_url
+        if video_id is not None:
+            payload["videoId"] = video_id
+        if video_time_sec is not None:
+            payload["videoTimeSec"] = round(video_time_sec, 3)
 
         resp = requests.post(
             f"{self.base_url}/api/v1/internal/alarms",
