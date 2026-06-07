@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface RoiRepository extends JpaRepository<Roi, Long> {
     List<Roi> findAllByCamera_CameraId(Long cameraId);
+    boolean existsByCamera_CameraId(Long cameraId);
 }

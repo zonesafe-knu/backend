@@ -17,13 +17,28 @@ class RoiChecker:
       4) 위 시나리오에 따라 알람 타입/심각도(severity)를 결정한다.
     """
 
-    def __init__(self, roi_configs: list[dict]):
+    # 진입 판정 inset (1920x1080 referenceWidth/Height 기준 픽셀)
+    # ROI 폴리곤을 안쪽으로 축소해서 사용 — 경계에 살짝 닿기만 한 false positive 알람 방지.
+    # 영상 실제 해상도에 따라 자동 스케일링됨.
+    DEFAULT_ENTRY_INSET_PX = 60
+
+    def __init__(
+        self,
+        roi_configs: list[dict],
+        frame_width: int | None = None,
+        frame_height: int | None = None,
+        entry_inset_px: int = DEFAULT_ENTRY_INSET_PX,
+    ):
         # roi_configs 예시 항목:
         # {
         #   "roiId": 1, "name": "지게차 통로", "active": true,
         #   "polygon": [[x1,y1], [x2,y2], ...],   # ROI 모양 (다각형 꼭짓점)
-        #   "dangerDistanceThreshold": 30          # ROI 외곽선 기준 '근접'으로 볼 픽셀 거리
+        #   "dangerDistanceThreshold": 30,         # ROI 외곽선 기준 '근접'으로 볼 픽셀 거리
+        #   "referenceWidth": 800,                 # ROI 좌표가 기준으로 한 캔버스 너비 (없으면 스케일링 X)
+        #   "referenceHeight": 600,                # ROI 좌표가 기준으로 한 캔버스 높이
         # }
+        # frame_width / frame_height: 실제 영상 프레임 해상도 (좌표계 일치를 위해 사용)
+        # entry_inset_px: 진입 판정 시 ROI를 안쪽으로 축소할 픽셀 (referenceWidth/Height 기준)
         self.rois = []
         for roi in roi_configs:
             # 비활성 ROI는 위험 판정에서 제외 (UI에서 토글로 끈 영역)
@@ -33,15 +48,50 @@ class RoiChecker:
             # 폴리곤은 최소 3개 꼭짓점이 있어야 면적이 생기므로 미만이면 스킵
             if not coords or len(coords) < 3:
                 continue
-            # shapely Polygon으로 변환 — 이후 contains/distance 계산에 사용
-            polygon = Polygon([(p[0], p[1]) for p in coords])
+
+            # ROI 좌표계와 영상 해상도가 다르면 비율 맞춰 스케일링
+            # 예: 프론트엔드 캔버스 800x600 기준 좌표 → 영상 1920x1080 기준 좌표
+            scale_x, scale_y = self._compute_scale(roi, frame_width, frame_height)
+            polygon = Polygon([(p[0] * scale_x, p[1] * scale_y) for p in coords])
+
+            # 진입 판정용 inset polygon — 안쪽으로 축소
+            # buffer(음수)는 폴리곤을 그 거리만큼 안쪽으로 줄임
+            inset_scaled = entry_inset_px * (scale_x + scale_y) / 2
+            entry_polygon = polygon.buffer(-inset_scaled)
+            # inset이 너무 크면 폴리곤이 사라지거나 MultiPolygon이 됨 — 빈 경우 원본으로 폴백
+            if entry_polygon.is_empty:
+                print(f"경고: ROI {roi.get('name','')} inset({inset_scaled:.0f}px) 적용 시 폴리곤 소멸 — 원본 사용")
+                entry_polygon = polygon
+
             self.rois.append({
                 "roiId": roi["roiId"],
                 "name": roi.get("name", ""),
-                "polygon": polygon,
+                "polygon": entry_polygon,
                 # 근접 거리 임계값 — None이면 '내부 진입'만 위험으로 본다.
-                "dangerDistanceThreshold": roi.get("dangerDistanceThreshold"),
+                # 거리 임계값도 좌표계 스케일에 맞춰 변환 (가로/세로 평균)
+                "dangerDistanceThreshold": self._scale_threshold(
+                    roi.get("dangerDistanceThreshold"), scale_x, scale_y
+                ),
             })
+
+    @staticmethod
+    def _compute_scale(roi: dict, frame_width: int | None, frame_height: int | None) -> tuple[float, float]:
+        """
+        ROI에 referenceWidth/Height가 있고 frame 크기를 알면 (frame/ref) 비율을 반환.
+        하나라도 없으면 1.0 (스케일링 안 함).
+        """
+        ref_w = roi.get("referenceWidth")
+        ref_h = roi.get("referenceHeight")
+        if not ref_w or not ref_h or not frame_width or not frame_height:
+            return 1.0, 1.0
+        return frame_width / ref_w, frame_height / ref_h
+
+    @staticmethod
+    def _scale_threshold(threshold: int | None, scale_x: float, scale_y: float) -> int | None:
+        if threshold is None:
+            return None
+        avg_scale = (scale_x + scale_y) / 2
+        return max(1, round(threshold * avg_scale))
 
     def check_danger(self, detections: list[dict]) -> list[dict]:
         """
@@ -101,22 +151,16 @@ class RoiChecker:
         use_foot: bool,
     ) -> list[dict]:
         """
-        주어진 객체들 중 ROI 폴리곤 '내부' 또는 '근접 거리 이내'에 있는 것만 골라낸다.
+        주어진 객체들 중 ROI 폴리곤 '내부'에 있는 것만 골라낸다.
 
         - use_foot=True  : bbox 하단 중앙(발 위치)을 기준점으로 사용 (사람용)
         - use_foot=False : bbox 정중앙을 기준점으로 사용 (지게차용)
-        - threshold      : ROI 외곽선과의 픽셀 거리 임계값. None이면 '근접' 판정 생략.
+        - threshold      : 현재 미사용. ROI 내부 진입만으로 판정 (근접 알람 비활성).
         """
         matched = []
         for obj in objects:
-            # 객체의 대표 좌표(point) 결정
             pt = self._foot_point(obj["bbox"]) if use_foot else self._center_point(obj["bbox"])
-
-            # (A) ROI 내부에 있으면 즉시 위험 후보
             if polygon.contains(pt):
-                matched.append(obj)
-            # (B) 외부지만 외곽선까지의 거리가 threshold 이하면 '근접' 위험 후보
-            elif threshold and polygon.exterior.distance(pt) <= threshold:
                 matched.append(obj)
         return matched
 

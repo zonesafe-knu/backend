@@ -16,6 +16,8 @@ public class RoiResponseDto {
     private AlarmRule alarmRule;
     private Boolean muteForkliftOnly;
     private Integer dangerDistanceThreshold;
+    private Integer referenceWidth;
+    private Integer referenceHeight;
     private Boolean active;
     private ZonedDateTime createdAt;
 }

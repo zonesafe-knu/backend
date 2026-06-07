@@ -2,13 +2,16 @@ package me.zonesafe.zonesafe_be.service;
 
 import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.domain.Camera;
+import me.zonesafe.zonesafe_be.domain.Video;
 import me.zonesafe.zonesafe_be.dto.CameraRequestDto;
 import me.zonesafe.zonesafe_be.dto.CameraResponseDto;
 import me.zonesafe.zonesafe_be.dto.CameraStatusEvent;
 import me.zonesafe.zonesafe_be.dto.CameraStatusUpdateRequest;
 import me.zonesafe.zonesafe_be.dto.StreamResponseDto;
+import me.zonesafe.zonesafe_be.dto.VideoAnalyzeJobResponseDto;
 import me.zonesafe.zonesafe_be.enums.CameraStatus;
 import me.zonesafe.zonesafe_be.repository.CameraRepository;
+import me.zonesafe.zonesafe_be.repository.VideoRepository;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +28,8 @@ public class CameraService {
     private final ModelMapper modelMapper;
     private final CameraEventPublisher cameraEventPublisher;
     private final VideoService videoService;
+    private final VideoRepository videoRepository;
+    private final VideoAnalysisService videoAnalysisService;
 
     //카메라 조회
     public List<CameraResponseDto> getCameras(Long siteId, CameraStatus status) {
@@ -132,6 +137,22 @@ public class CameraService {
                 .changedAt(ZonedDateTime.now())
                 .build();
         cameraEventPublisher.publishStatus(event);
+    }
+
+    //카메라 화면 접속 시 YOLO 분석 시작 — 등록된 영상 + ROI 검증 후 분석 트리거
+    @Transactional
+    public VideoAnalyzeJobResponseDto startCameraStream(Long cameraId) {
+        if (!cameraRepository.existsById(cameraId)) {
+            throw new IllegalArgumentException("카메라를 찾을 수 없습니다. ID: " + cameraId);
+        }
+
+        List<Video> videos = videoRepository.findAllByCameraContext(cameraId);
+        if (videos.isEmpty()) {
+            throw new IllegalStateException("해당 카메라에 등록된 영상이 없습니다. cameraId=" + cameraId);
+        }
+
+        Video video = videos.get(0);
+        return videoAnalysisService.startAnalysis(video.getVideoId(), null);
     }
 
     public StreamResponseDto getStreamUrl(Long cameraId) {

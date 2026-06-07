@@ -37,6 +37,10 @@ public class Roi {
 
     private Integer dangerDistanceThreshold;
 
+    //ROI를 그릴 때 기준이 된 캔버스(또는 영상) 해상도 — detection 단계에서 영상 실제 해상도와 비율 맞춰 스케일링
+    private Integer referenceWidth;
+    private Integer referenceHeight;
+
     @Column(nullable = false)
     private Boolean active;
 

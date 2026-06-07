@@ -20,14 +20,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.annotation.PostConstruct;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.ZonedDateTime;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,16 +56,6 @@ public class VideoAnalysisService {
     private String videosBasePath;
 
     private final ExecutorService detectionExecutor = Executors.newCachedThreadPool();
-
-    @PostConstruct
-    public void autoStartOnBoot() {
-        List<me.zonesafe.zonesafe_be.domain.Video> videos = videoRepository.findAll();
-        for (me.zonesafe.zonesafe_be.domain.Video video : videos) {
-            if (video.getCameraContext() == null) continue;
-            log.info("서버 시작 — 영상 자동 분석 시작: videoId={}, cameraContext={}", video.getVideoId(), video.getCameraContext());
-            startAnalysis(video.getVideoId(), null);
-        }
-    }
 
     //영상 탐지 이벤트 목록
     public List<VideoEventResponseDto> getEventsByVideoId(Long videoId) {
@@ -144,6 +134,27 @@ public class VideoAnalysisService {
         Video video = videoRepository.findById(videoId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 영상이 존재하지 않습니다. ID: " + videoId));
 
+        Long cameraId = video.getCameraContext();
+        if (cameraId == null) {
+            throw new IllegalStateException("영상에 카메라 연결 정보(cameraContext)가 없어 분석을 시작할 수 없습니다. videoId=" + videoId);
+        }
+
+        //ROI가 없어도 분석은 시작 — 객체 탐지(bbox)는 진행하고 ROI 알람은 ROI 등록 후 자동 반영(main.py 30s refresh)
+
+        //이미 QUEUED/RUNNING인 job이 있으면 재사용
+        Optional<VideoAnalysisJob> existing = jobRepository
+                .findFirstByVideo_VideoIdAndStatusInOrderByCreatedAtDesc(
+                        videoId, EnumSet.of(AnalysisJobStatus.QUEUED, AnalysisJobStatus.RUNNING));
+        if (existing.isPresent()) {
+            VideoAnalysisJob current = existing.get();
+            log.info("기존 분석 job 재사용: jobId={}, status={}", current.getJobId(), current.getStatus());
+            VideoAnalyzeJobResponseDto dto = new VideoAnalyzeJobResponseDto();
+            dto.setJobId(current.getJobId());
+            dto.setVideoId(videoId);
+            dto.setStatus(current.getStatus());
+            return dto;
+        }
+
         VideoAnalysisJob job = new VideoAnalysisJob();
         job.setJobId(generateJobId());
         job.setVideo(video);
@@ -153,12 +164,7 @@ public class VideoAnalysisService {
 
         VideoAnalysisJob saved = jobRepository.save(job);
 
-        Long cameraId = video.getCameraContext();
-        if (cameraId != null) {
-            detectionExecutor.submit(() -> runDetectionScript(saved.getJobId(), video, cameraId));
-        } else {
-            log.warn("영상에 카메라 연결 정보(cameraContext)가 없어 분석을 시작할 수 없습니다. videoId={}", videoId);
-        }
+        detectionExecutor.submit(() -> runDetectionScript(saved.getJobId(), video, cameraId));
 
         VideoAnalyzeJobResponseDto dto = new VideoAnalyzeJobResponseDto();
         dto.setJobId(saved.getJobId());

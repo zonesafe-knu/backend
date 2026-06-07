@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import me.zonesafe.zonesafe_be.dto.CameraRequestDto;
 import me.zonesafe.zonesafe_be.dto.CameraResponseDto;
 import me.zonesafe.zonesafe_be.dto.StreamResponseDto;
+import me.zonesafe.zonesafe_be.dto.VideoAnalyzeJobResponseDto;
 import me.zonesafe.zonesafe_be.enums.CameraStatus;
 import me.zonesafe.zonesafe_be.service.CameraService;
 import org.springframework.http.HttpStatus;
@@ -58,5 +59,12 @@ public class CameraController {
     @ResponseStatus(HttpStatus.OK)
     public StreamResponseDto getStreamUrl(@PathVariable Long cameraId) {
         return cameraService.getStreamUrl(cameraId);
+    }
+
+    //카메라 화면 접속 시 YOLO 분석 시작
+    @PostMapping("/{cameraId}/stream/start")
+    @ResponseStatus(HttpStatus.OK)
+    public VideoAnalyzeJobResponseDto startCameraStream(@PathVariable Long cameraId) {
+        return cameraService.startCameraStream(cameraId);
     }
 }

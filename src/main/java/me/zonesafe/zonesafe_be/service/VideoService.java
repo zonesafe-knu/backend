@@ -1,6 +1,7 @@
 package me.zonesafe.zonesafe_be.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import me.zonesafe.zonesafe_be.domain.Video;
 import me.zonesafe.zonesafe_be.dto.VideoResponseDto;
 import me.zonesafe.zonesafe_be.enums.VideoStatus;
@@ -25,6 +26,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -134,6 +136,11 @@ public class VideoService {
                                         String uploadedBy) {
         validateFile(file);
 
+        //카메라당 mp4 1개 강제 — 이미 등록된 영상이 있으면 거절
+        if (cameraContext != null && !videoRepository.findAllByCameraContext(cameraContext).isEmpty()) {
+            throw new IllegalStateException("이 카메라에 이미 영상이 등록되어 있습니다. cameraId=" + cameraContext);
+        }
+
         String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "video.mp4";
         String storedFilename = UUID.randomUUID() + ".mp4";
         Path storedPath = saveToStorage(file, storedFilename);
@@ -167,8 +174,14 @@ public class VideoService {
 
         Video saved = videoRepository.save(video);
 
+        //업로드 시 카메라가 연결돼 있으면 자동 분석 시작 (ROI 없어도 객체 탐지는 진행)
         if (cameraContext != null) {
-            videoAnalysisService.startAnalysis(saved.getVideoId(), null);
+            try {
+                videoAnalysisService.startAnalysis(saved.getVideoId(), null);
+            } catch (Exception e) {
+                log.warn("업로드 후 자동 분석 시작 실패 — videoId={}, cameraId={}, reason={}",
+                        saved.getVideoId(), cameraContext, e.getMessage());
+            }
         }
 
         return convertToDto(saved);

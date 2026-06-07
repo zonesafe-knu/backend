@@ -91,18 +91,6 @@ def main():
 
     client = BackendClient(args.backend_url) if args.backend_url else None
 
-    if args.roi_json:
-        rois = load_rois_from_file(args.roi_json)
-    else:
-        rois = client.get_rois(args.camera_id)
-
-    roi_checker = RoiChecker(rois)
-    print(f"활성 ROI {len(roi_checker.rois)}개 로드 완료")
-
-    if len(roi_checker.rois) == 0:
-        print("경고: 활성 ROI가 없습니다. ROI 설정을 확인해주세요.")
-        return
-
     cap = cv2.VideoCapture(args.source)
     if not cap.isOpened():
         print(f"영상 소스를 열 수 없습니다: {args.source}")
@@ -110,7 +98,22 @@ def main():
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or None
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or None
     is_file = total_frames > 0
+
+    print(f"영상 해상도: {frame_width}x{frame_height}")
+
+    if args.roi_json:
+        rois = load_rois_from_file(args.roi_json)
+    else:
+        rois = client.get_rois(args.camera_id)
+
+    roi_checker = RoiChecker(rois, frame_width, frame_height)
+    print(f"활성 ROI {len(roi_checker.rois)}개 로드 완료")
+
+    if len(roi_checker.rois) == 0:
+        print(f"안내: 활성 ROI가 없습니다 — 객체 탐지(bbox)만 진행, {args.roi_refresh}초마다 ROI 재조회")
 
     if is_file:
         print(f"영상 파일: {total_frames}프레임, {fps:.1f}fps, {total_frames / fps:.1f}초")
@@ -128,6 +131,8 @@ def main():
     frame_idx = 0
     last_roi_refresh = time.time()
     loop_count = 0
+    # 1배속 페이싱 기준 시각 — 영상 파일 모드에서만 적용 (RTSP는 자체적으로 실시간)
+    playback_start = time.time() if is_file else None
 
     try:
         while True:
@@ -138,11 +143,21 @@ def main():
                     print(f"\n--- 반복 {loop_count}회 완료, 처음부터 다시 분석 ---")
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     frame_idx = 0
+                    playback_start = time.time()  # 페이싱 기준 리셋
                     model.predictor = None
                     continue
                 break
 
             frame_idx += 1
+
+            # 1배속 페이싱 — frame_idx 번째 프레임은 (frame_idx / fps) 초 시점에 처리되어야 함
+            # 프론트엔드 <video> 가 1배속으로 재생되므로 분석도 같은 속도로 맞춤 (알람 표시 동기화)
+            if is_file and playback_start is not None:
+                expected_elapsed = frame_idx / fps
+                actual_elapsed = time.time() - playback_start
+                if actual_elapsed < expected_elapsed:
+                    time.sleep(expected_elapsed - actual_elapsed)
+
             if frame_idx % args.skip_frames != 0:
                 continue
 
@@ -151,7 +166,7 @@ def main():
             if client and (now - last_roi_refresh > args.roi_refresh):
                 try:
                     rois = client.get_rois(args.camera_id)
-                    roi_checker = RoiChecker(rois)
+                    roi_checker = RoiChecker(rois, frame_width, frame_height)
                     last_roi_refresh = now
                     print(f"ROI 갱신 완료 — 활성 ROI {len(roi_checker.rois)}개")
                 except Exception as e:

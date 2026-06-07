@@ -3,12 +3,15 @@ package me.zonesafe.zonesafe_be.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import me.zonesafe.zonesafe_be.domain.Camera;
 import me.zonesafe.zonesafe_be.domain.Roi;
+import me.zonesafe.zonesafe_be.domain.Video;
 import me.zonesafe.zonesafe_be.dto.RoiRequestDto;
 import me.zonesafe.zonesafe_be.dto.RoiResponseDto;
 import me.zonesafe.zonesafe_be.repository.CameraRepository;
 import me.zonesafe.zonesafe_be.repository.RoiRepository;
+import me.zonesafe.zonesafe_be.repository.VideoRepository;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,12 +19,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class RoiService {
     private final RoiRepository roiRepository;
     private final CameraRepository cameraRepository;
+    private final VideoRepository videoRepository;
+    private final VideoAnalysisService videoAnalysisService;
     private final ModelMapper modelMapper;
     private final ObjectMapper objectMapper;
 
@@ -57,9 +63,23 @@ public class RoiService {
         roi.setAlarmRule(requestDto.getAlarmRule());
         roi.setMuteForkliftOnly(requestDto.getMuteForkliftOnly() != null ? requestDto.getMuteForkliftOnly() : true);
         roi.setDangerDistanceThreshold(requestDto.getDangerDistanceThreshold());
+        roi.setReferenceWidth(requestDto.getReferenceWidth());
+        roi.setReferenceHeight(requestDto.getReferenceHeight());
         roi.setActive(requestDto.getActive() != null ? requestDto.getActive() : true);
 
         Roi saved = roiRepository.save(roi);
+
+        //ROI 등록 시 해당 카메라에 영상이 있으면 자동 분석 시작
+        List<Video> videos = videoRepository.findAllByCameraContext(camera.getCameraId());
+        if (!videos.isEmpty()) {
+            try {
+                videoAnalysisService.startAnalysis(videos.get(0).getVideoId(), null);
+            } catch (Exception e) {
+                log.warn("ROI 등록 후 자동 분석 시작 실패 — cameraId={}, reason={}",
+                        camera.getCameraId(), e.getMessage());
+            }
+        }
+
         return convertToDto(saved);
     }
 
@@ -81,6 +101,8 @@ public class RoiService {
         roi.setAlarmRule(requestDto.getAlarmRule());
         if (requestDto.getMuteForkliftOnly() != null) roi.setMuteForkliftOnly(requestDto.getMuteForkliftOnly());
         roi.setDangerDistanceThreshold(requestDto.getDangerDistanceThreshold());
+        if (requestDto.getReferenceWidth() != null) roi.setReferenceWidth(requestDto.getReferenceWidth());
+        if (requestDto.getReferenceHeight() != null) roi.setReferenceHeight(requestDto.getReferenceHeight());
         if (requestDto.getActive() != null) roi.setActive(requestDto.getActive());
 
         return convertToDto(roi);
