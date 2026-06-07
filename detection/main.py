@@ -14,6 +14,7 @@ import json
 import random
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -37,7 +38,11 @@ def parse_args():
     parser.add_argument("--source", required=True, help="영상 소스 (mp4 파일 경로 또는 RTSP URL)")
     parser.add_argument("--camera-id", type=int, required=True, help="백엔드에 등록된 카메라 ID")
     parser.add_argument("--video-id", type=int, default=None, help="업로드된 영상 ID (지정 시 알람 발생 시점 ±5초 클립 자동 저장)")
-    parser.add_argument("--model", default="yolov8n.pt", help="YOLO 모델 파일 경로")
+    parser.add_argument(
+        "--model",
+        default=str(Path(__file__).resolve().parent / "best.pt"),
+        help="YOLO 모델 파일 경로 (기본: detection/best.pt — person/forklift 학습 모델)",
+    )
     parser.add_argument("--confidence", type=float, default=0.5, help="탐지 confidence 임계값")
 
     roi_group = parser.add_mutually_exclusive_group(required=True)
@@ -152,6 +157,7 @@ def main():
                 except Exception as e:
                     print(f"ROI 갱신 실패: {e}")
 
+            # YOLO 트래킹 추론 — persist=True 로 프레임 간 trackId 유지
             results = model.track(frame, conf=args.confidence, persist=True, verbose=False)
             detections = build_detections(results, model)
 
@@ -159,6 +165,7 @@ def main():
                 continue
 
             frame_ts = datetime.now(timezone.utc).isoformat()
+            # 영상 파일이면 현재 프레임의 영상 내 시각(초)을 계산해 클립 추출 기준에 사용
             video_time_sec = (frame_idx / fps) % (total_frames / fps) if is_file else None
             if client:
                 try:
@@ -166,9 +173,13 @@ def main():
                 except Exception as e:
                     print(f"탐지 프레임 전송 실패: {e}")
 
+            # === 핵심: ROI 위험 판정 ===
+            # roi_checker가 detections를 받아 모든 ROI에 대해 위험 여부를 판정하고
+            # 알람 후보 리스트를 반환한다. (자세한 판정 로직은 roi_checker.py 참고)
             alarms = roi_checker.check_danger(detections)
             for alarm in alarms:
                 roi_id = alarm["roiId"]
+                # 쿨다운: 같은 ROI에서 짧은 시간 내 알람이 폭주하지 않도록 일정 시간(기본 10초) 무시
                 if now - alarm_cooldowns.get(roi_id, 0) < args.alarm_cooldown:
                     continue
 

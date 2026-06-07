@@ -19,4 +19,8 @@ public class AlarmCreateRequest {
     private String detectionsJson;
     private Long clipId;
     private ZonedDateTime occurredAt;
+
+    // 업로드된 영상 분석 중 발생한 알람의 경우, 클립 추출용 메타데이터
+    private Long videoId;
+    private Double videoTimeSec;
 }

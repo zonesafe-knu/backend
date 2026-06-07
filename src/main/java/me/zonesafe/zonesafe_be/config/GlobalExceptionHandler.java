@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
@@ -45,6 +46,13 @@ public class GlobalExceptionHandler {
         log.error("IllegalStateException", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("INTERNAL_ERROR", e.getMessage()));
+    }
+
+    // 영상/클립 Range 스트리밍 중 클라이언트가 연결을 끊으면 발생 (브라우저 seek, 페이지 이동 등).
+    // 응답을 보낼 수 없는 상태이므로 ResponseEntity 없이 종료, 로그는 DEBUG로 다운그레이드.
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientDisconnect(AsyncRequestNotUsableException e) {
+        log.debug("Client disconnected during async response: {}", e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

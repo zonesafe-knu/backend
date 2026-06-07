@@ -3,9 +3,11 @@ package me.zonesafe.zonesafe_be.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import me.zonesafe.zonesafe_be.domain.Alarm;
 import me.zonesafe.zonesafe_be.domain.AlarmSpecification;
 import me.zonesafe.zonesafe_be.domain.Camera;
+import me.zonesafe.zonesafe_be.domain.Clip;
 import me.zonesafe.zonesafe_be.dto.AlarmCreateRequest;
 import me.zonesafe.zonesafe_be.dto.AlarmEvent;
 import me.zonesafe.zonesafe_be.dto.AlarmResponseDto;
@@ -30,7 +32,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -41,6 +46,10 @@ public class AlarmService {
     private final ModelMapper modelMapper;
     private final ObjectMapper objectMapper;
     private final AlarmEventPublisher alarmEventPublisher;
+    private final ClipService clipService;
+    private final AlarmClipAttacher alarmClipAttacher;
+
+    private final ExecutorService clipExtractionExecutor = Executors.newSingleThreadExecutor();
 
     @Transactional
     public AlarmResponseDto createAlarm(AlarmCreateRequest request) {
@@ -72,6 +81,23 @@ public class AlarmService {
                 .occurredAt(saved.getOccurredAt())
                 .build();
         alarmEventPublisher.publish(event);
+
+        // 위험구역 알람의 경우 비동기로 ±5초 클립 추출/저장 후 alarm.clipId 갱신
+        if (request.getVideoId() != null && request.getVideoTimeSec() != null) {
+            final Long alarmId = saved.getAlarmId();
+            final Long cameraId = camera.getCameraId();
+            final Long videoId = request.getVideoId();
+            final double videoTimeSec = request.getVideoTimeSec();
+            final ZonedDateTime occurredAt = saved.getOccurredAt();
+            clipExtractionExecutor.submit(() -> {
+                try {
+                    Clip clip = clipService.extractAndSaveClip(alarmId, cameraId, videoId, videoTimeSec, occurredAt);
+                    alarmClipAttacher.attach(alarmId, clip.getClipId());
+                } catch (Exception e) {
+                    log.error("클립 추출 실패: alarmId={}, videoId={}, videoTimeSec={}", alarmId, videoId, videoTimeSec, e);
+                }
+            });
+        }
 
         return convertToDto(saved);
     }

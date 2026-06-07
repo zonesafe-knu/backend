@@ -18,5 +18,6 @@ public class AlarmStatusChangedEvent {
     private Long alarmId;
     private AlarmStatus status;
     private String comment;
+    private Long clipId;
     private ZonedDateTime changedAt;
 }

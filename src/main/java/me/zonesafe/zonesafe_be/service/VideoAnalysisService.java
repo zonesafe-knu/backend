@@ -185,6 +185,7 @@ public class VideoAnalysisService {
                     pythonPath, "-u", scriptPath.toString(),
                     "--source", videoPath.toString(),
                     "--camera-id", cameraId.toString(),
+                    "--video-id", video.getVideoId().toString(),
                     "--backend-url", backendUrl,
                     "--model", modelAbsPath.toString(),
                     "--loop"
