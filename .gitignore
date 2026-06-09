@@ -47,4 +47,5 @@ detection/__pycache__/
 detection/*.pt
 detection/bus.jpg
 detection/package-lock.json
-detection/*_events.json
+detection/*_events.json.DS_Store
+detection/*.png
