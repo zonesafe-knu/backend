@@ -58,6 +58,8 @@ public class AlarmService {
         alarm.setClipId(request.getClipId());
         alarm.setSnapshotUrl(request.getSnapshotUrl());
         alarm.setOccurredAt(request.getOccurredAt() != null ? request.getOccurredAt() : ZonedDateTime.now());
+        alarm.setVideoId(request.getVideoId());
+        alarm.setVideoTimeSec(request.getVideoTimeSec());
 
         Alarm saved = alarmRepository.save(alarm);
 
@@ -70,6 +72,8 @@ public class AlarmService {
                 .message(saved.getMessage())
                 .snapshotUrl(request.getSnapshotUrl())
                 .occurredAt(saved.getOccurredAt())
+                .videoId(saved.getVideoId())
+                .videoTimeSec(saved.getVideoTimeSec())
                 .build();
         alarmEventPublisher.publish(event);
 
