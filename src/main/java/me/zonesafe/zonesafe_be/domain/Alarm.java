@@ -48,6 +48,10 @@ public class Alarm {
 
     private Long clipId; // nullable
 
+    private Long videoId; // nullable — 업로드 영상 분석 시에만 존재
+
+    private Double videoTimeSec; // nullable — 알람이 발생한 영상 내 시각(초)
+
     @Column(length = 500)
     private String snapshotUrl;
 
