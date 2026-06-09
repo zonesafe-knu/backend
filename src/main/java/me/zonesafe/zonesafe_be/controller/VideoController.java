@@ -8,6 +8,8 @@ import me.zonesafe.zonesafe_be.dto.VideoAnalyzeRequestDto;
 import me.zonesafe.zonesafe_be.dto.VideoEventResponseDto;
 import me.zonesafe.zonesafe_be.dto.VideoResponseDto;
 import me.zonesafe.zonesafe_be.enums.VideoStatus;
+import me.zonesafe.zonesafe_be.dto.DetectionFrame;
+import me.zonesafe.zonesafe_be.service.DetectionFrameStore;
 import me.zonesafe.zonesafe_be.service.VideoAnalysisService;
 import me.zonesafe.zonesafe_be.service.VideoService;
 import org.springframework.core.io.Resource;
@@ -35,6 +37,7 @@ import java.util.List;
 public class VideoController {
     private final VideoService videoService;
     private final VideoAnalysisService videoAnalysisService;
+    private final DetectionFrameStore detectionFrameStore;
 
     //영상 업로드 (TODO: Spring Security 도입 후 @PreAuthorize("hasAnyRole('ADMIN','OPERATOR')") 적용)
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -160,5 +163,12 @@ public class VideoController {
     @ResponseStatus(HttpStatus.OK)
     public List<VideoEventResponseDto> getEvents(@PathVariable Long videoId) {
         return videoAnalysisService.getEventsByVideoId(videoId);
+    }
+
+    //영상 탐지 프레임 전체 조회 (프론트 재생 시 바운딩박스 표시용)
+    @GetMapping("/{videoId}/detection-frames")
+    @ResponseStatus(HttpStatus.OK)
+    public List<DetectionFrame> getDetectionFrames(@PathVariable Long videoId) {
+        return detectionFrameStore.getAll(videoId);
     }
 }
