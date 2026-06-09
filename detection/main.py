@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument("--source", required=True, help="영상 소스 (mp4 파일 경로 또는 RTSP URL)")
     parser.add_argument("--camera-id", type=int, required=True, help="백엔드에 등록된 카메라 ID")
     parser.add_argument("--video-id", type=int, default=None, help="업로드된 영상 ID (지정 시 알람 발생 시점 ±5초 클립 자동 저장)")
-    parser.add_argument("--model", default="yolov8n.pt", help="YOLO 모델 파일 경로")
+    parser.add_argument("--model", default="model.pt", help="YOLO 모델 파일 경로")
     parser.add_argument("--confidence", type=float, default=0.5, help="탐지 confidence 임계값")
 
     roi_group = parser.add_mutually_exclusive_group(required=True)
@@ -49,6 +49,8 @@ def parse_args():
     parser.add_argument("--alarm-cooldown", type=int, default=10, help="같은 ROI 알람 재전송 대기 시간 (초)")
     parser.add_argument("--seed", type=int, default=None, help="랜덤 시드 (미지정 시 고정 안 함)")
     parser.add_argument("--loop", action="store_true", help="영상 끝까지 분석 후 처음부터 반복")
+    parser.add_argument("--realtime", action="store_true", help="영상 FPS에 맞춰 분석 속도 제한 (WebSocket 동기화용)")
+    parser.add_argument("--show", action="store_true", help="바운딩박스 시각화 창 표시 (로컬 테스트용)")
     return parser.parse_args()
 
 
@@ -123,6 +125,7 @@ def main():
     frame_idx = 0
     last_roi_refresh = time.time()
     loop_count = 0
+    analysis_start_time = time.time()
 
     try:
         while True:
@@ -134,6 +137,7 @@ def main():
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     frame_idx = 0
                     model.predictor = None
+                    analysis_start_time = time.time()
                     continue
                 break
 
@@ -152,8 +156,14 @@ def main():
                 except Exception as e:
                     print(f"ROI 갱신 실패: {e}")
 
-            results = model.track(frame, conf=args.confidence, persist=True, verbose=False)
+            results = model.predict(frame, conf=args.confidence, verbose=False)
             detections = build_detections(results, model)
+
+            if args.show:
+                annotated = results[0].plot() if results else frame
+                cv2.imshow("ZoneSafe Detection", annotated)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
 
             if not detections:
                 continue
@@ -162,7 +172,7 @@ def main():
             video_time_sec = (frame_idx / fps) % (total_frames / fps) if is_file else None
             if client:
                 try:
-                    client.send_detection_frame(args.camera_id, frame_ts, detections, video_time_sec)
+                    client.send_detection_frame(args.camera_id, frame_ts, detections, video_time_sec, args.video_id)
                 except Exception as e:
                     print(f"탐지 프레임 전송 실패: {e}")
 
@@ -203,12 +213,20 @@ def main():
                     except Exception as e:
                         print(f"  알람 전송 실패: {e}")
 
+            if args.realtime and is_file:
+                target_elapsed = frame_idx / fps
+                actual_elapsed = time.time() - analysis_start_time
+                if target_elapsed > actual_elapsed:
+                    time.sleep(target_elapsed - actual_elapsed)
+
             if is_file and frame_idx % (args.skip_frames * 100) == 0:
                 progress = frame_idx / total_frames * 100
                 print(f"  진행률: {progress:.0f}% ({frame_idx}/{total_frames})")
 
     finally:
         cap.release()
+        if args.show:
+            cv2.destroyAllWindows()
 
     print(f"\n분석 완료 — {len(all_events)}건 위험 이벤트 감지")
 

@@ -31,8 +31,8 @@ class RoiChecker:
         """
         alarms = []
 
-        persons = [d for d in detections if d["label"] in ("person", "worker")]
-        forklifts = [d for d in detections if d["label"] == "forklift"]
+        persons = [d for d in detections if d["label"].lower() in ("person", "worker")]
+        forklifts = [d for d in detections if d["label"].lower() in ("forklift(v)", "forklift(d)", "forklift(h)", "forklift")]
 
         for roi in self.rois:
             polygon = roi["polygon"]

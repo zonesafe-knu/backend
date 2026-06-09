@@ -20,7 +20,7 @@ class BackendClient:
             return data["data"]
         return data
 
-    def send_detection_frame(self, camera_id: int, frame_ts: str, objects: list[dict], video_time_sec: float | None = None):
+    def send_detection_frame(self, camera_id: int, frame_ts: str, objects: list[dict], video_time_sec: float | None = None, video_id: int | None = None):
         payload = {
             "cameraId": camera_id,
             "frameTs": frame_ts,
@@ -28,6 +28,8 @@ class BackendClient:
         }
         if video_time_sec is not None:
             payload["videoTimeSec"] = round(video_time_sec, 3)
+        if video_id is not None:
+            payload["videoId"] = video_id
         resp = requests.post(
             f"{self.base_url}/api/v1/internal/detections/frame",
             json=payload,
