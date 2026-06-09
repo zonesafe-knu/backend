@@ -3,9 +3,11 @@ package me.zonesafe.zonesafe_be.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import me.zonesafe.zonesafe_be.domain.Alarm;
 import me.zonesafe.zonesafe_be.domain.AlarmSpecification;
 import me.zonesafe.zonesafe_be.domain.Camera;
+import me.zonesafe.zonesafe_be.domain.Clip;
 import me.zonesafe.zonesafe_be.dto.AlarmCreateRequest;
 import me.zonesafe.zonesafe_be.dto.AlarmEvent;
 import me.zonesafe.zonesafe_be.dto.AlarmResponseDto;
@@ -31,6 +33,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import java.time.ZonedDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -41,6 +44,7 @@ public class AlarmService {
     private final ModelMapper modelMapper;
     private final ObjectMapper objectMapper;
     private final AlarmEventPublisher alarmEventPublisher;
+    private final ClipExtractionService clipExtractionService;
 
     @Transactional
     public AlarmResponseDto createAlarm(AlarmCreateRequest request) {
@@ -62,6 +66,22 @@ public class AlarmService {
         alarm.setVideoTimeSec(request.getVideoTimeSec());
 
         Alarm saved = alarmRepository.save(alarm);
+
+        // 업로드 영상 분석에서 발생한 알람이면 원본 영상에서 ±N초 클립 자동 추출
+        if (saved.getClipId() == null
+                && request.getVideoId() != null
+                && request.getVideoTimeSec() != null) {
+            try {
+                Clip clip = clipExtractionService.extractForAlarm(
+                        saved, request.getVideoId(), request.getVideoTimeSec());
+                if (clip != null) {
+                    saved.setClipId(clip.getClipId()); // dirty checking 으로 UPDATE
+                }
+            } catch (Exception e) {
+                log.warn("알람 클립 추출 중 예외 (알람은 정상 저장됨): alarmId={}, {}",
+                        saved.getAlarmId(), e.getMessage());
+            }
+        }
 
         AlarmEvent event = AlarmEvent.builder()
                 .alarmId(saved.getAlarmId())
