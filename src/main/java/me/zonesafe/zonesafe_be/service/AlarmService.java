@@ -67,20 +67,26 @@ public class AlarmService {
 
         Alarm saved = alarmRepository.save(alarm);
 
-        // 업로드 영상 분석에서 발생한 알람이면 원본 영상에서 ±N초 클립 자동 추출
+        // 클립 추출은 비동기로 실행 — WebSocket 푸시를 블로킹하지 않음
         if (saved.getClipId() == null
                 && request.getVideoId() != null
                 && request.getVideoTimeSec() != null) {
-            try {
-                Clip clip = clipExtractionService.extractForAlarm(
-                        saved, request.getVideoId(), request.getVideoTimeSec());
-                if (clip != null) {
-                    saved.setClipId(clip.getClipId()); // dirty checking 으로 UPDATE
+            Long alarmId = saved.getAlarmId();
+            Long videoId = request.getVideoId();
+            double videoTimeSec = request.getVideoTimeSec();
+            Thread.ofVirtual().start(() -> {
+                try {
+                    Clip clip = clipExtractionService.extractForAlarm(saved, videoId, videoTimeSec);
+                    if (clip != null) {
+                        alarmRepository.findById(alarmId).ifPresent(a -> {
+                            a.setClipId(clip.getClipId());
+                            alarmRepository.save(a);
+                        });
+                    }
+                } catch (Exception e) {
+                    log.warn("알람 클립 추출 중 예외 (알람은 정상 저장됨): alarmId={}, {}", alarmId, e.getMessage());
                 }
-            } catch (Exception e) {
-                log.warn("알람 클립 추출 중 예외 (알람은 정상 저장됨): alarmId={}, {}",
-                        saved.getAlarmId(), e.getMessage());
-            }
+            });
         }
 
         AlarmEvent event = AlarmEvent.builder()
