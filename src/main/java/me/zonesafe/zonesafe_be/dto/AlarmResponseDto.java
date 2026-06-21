@@ -33,7 +33,8 @@ public class AlarmResponseDto {
     private List<DetectionDto> detections;
 
     private Long clipId;
-    //스냅샷 url 추가해야함
+    private Long videoId;
+    private Double videoTimeSec;
     private ZonedDateTime occurredAt;
 
     @Getter

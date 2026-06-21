@@ -33,6 +33,7 @@ public class AlarmController {
     @ResponseStatus(HttpStatus.OK)
     public PageResponseDto<AlarmResponseDto> getAlarms(
             @RequestParam(required = false) Long cameraId,
+            @RequestParam(required = false) Long roiId,
             @RequestParam(required = false) AlarmSeverity severity,
             @RequestParam(required = false) AlarmType type,
             @RequestParam(required = false) AlarmStatus status,
@@ -40,7 +41,7 @@ public class AlarmController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime to,
             @PageableDefault(size = 20, sort = "occurredAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        Page<AlarmResponseDto> pageResult = alarmService.getAlarms(cameraId, severity, type, status, from, to, pageable);
+        Page<AlarmResponseDto> pageResult = alarmService.getAlarms(cameraId, roiId, severity, type, status, from, to, pageable);
 
         return new PageResponseDto<>(pageResult);
     }
@@ -77,14 +78,7 @@ public class AlarmController {
     @PostMapping("/bulk-ack")
     @ResponseStatus(HttpStatus.OK)
     public Map<String, Object> bulkAckAlarms(@RequestBody AlarmBulkAckRequest request){
-        //서비스 호출 후 업데이트된 개수 반환
         int updatedCount = alarmService.bulkAckAlarms(request.getAlarmIds());
-
-        // 프론트엔드가 결과를 알 수 있게 간단한 JSON 형태로 응답해 줍니다.
-        return Map.of(
-                "success", true,
-                "updatedCount", updatedCount,
-                "message", updatedCount + "개의 알람이 성공적으로 확인 처리되었습니다."
-        );
+        return Map.of("updatedCount", updatedCount);
     }
 }

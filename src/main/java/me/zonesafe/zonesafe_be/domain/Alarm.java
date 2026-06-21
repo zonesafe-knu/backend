@@ -25,10 +25,9 @@ public class Alarm {
     @JoinColumn(name = "camera_id", nullable = false)
     private Camera camera;
 
-//    // 외래키 설정 2: Roi 참조 (nullable, 명세서 반영)
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "roi_id")
-//    private Roi roi;
+    // ROI 참조 (nullable)
+    @Column(name = "roi_id")
+    private Long roiId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -48,6 +47,13 @@ public class Alarm {
     private String detectionsJson; // 명세서의 json 타입 반영 (String으로 우선 매핑)
 
     private Long clipId; // nullable
+
+    private Long videoId; // nullable — 업로드 영상 분석 시에만 존재
+
+    private Double videoTimeSec; // nullable — 알람이 발생한 영상 내 시각(초)
+
+    @Column(length = 500)
+    private String snapshotUrl;
 
     @Column(length = 500)
     private String comment;

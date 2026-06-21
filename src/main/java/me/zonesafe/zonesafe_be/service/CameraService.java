@@ -24,6 +24,7 @@ public class CameraService {
     private final CameraRepository cameraRepository;
     private final ModelMapper modelMapper;
     private final CameraEventPublisher cameraEventPublisher;
+    private final VideoService videoService;
 
     //카메라 조회
     public List<CameraResponseDto> getCameras(Long siteId, CameraStatus status) {
@@ -68,13 +69,13 @@ public class CameraService {
         return modelMapper.map(savedCamera, CameraResponseDto.class);
     }
 
-    //카메라 삭제
+    //카메라 삭제 — 연결된 영상(cameraContext)도 함께 정리
     @Transactional
     public void deleteCamera(Long cameraId) {
-        //삭제할 카메라가 있는지 확인
         Camera camera = cameraRepository.findById(cameraId)
                 .orElseThrow(()->new IllegalArgumentException("삭제하려는 카메라가 존재하지 않습니다. ID: " + cameraId));
 
+        videoService.deleteVideosByCameraContext(cameraId);
         cameraRepository.delete(camera);
     }
 

@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/clips")
@@ -32,14 +31,14 @@ public class ClipController {
     //클립 목록 조회
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public Map<String, PageResponseDto<ClipResponseDto>> getClips(
+    public PageResponseDto<ClipResponseDto> getClips(
             @RequestParam(required = false) Long cameraId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime to,
             @PageableDefault(size = 20, sort = "occurredAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         Page<ClipResponseDto> pageResult = clipService.getClips(cameraId, from, to, pageable);
-        return Map.of("data", new PageResponseDto<>(pageResult));
+        return new PageResponseDto<>(pageResult);
     }
 
     //클립 다운로드

@@ -24,4 +24,6 @@ public class AlarmEvent {
     private String message;
     private String snapshotUrl;
     private ZonedDateTime occurredAt;
+    private Long videoId;
+    private Double videoTimeSec;
 }

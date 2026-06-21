@@ -1,0 +1,11 @@
+[
+  {
+    "roiId": 1,
+    "name": "위험구역A",
+    "polygon": [[100, 50], [500, 50], [500, 400], [100, 400]],
+    "alarmRule": "WORKER_ONLY",
+    "muteForkliftOnly": true,
+    "dangerDistanceThreshold": 50,
+    "active": true
+  }
+]

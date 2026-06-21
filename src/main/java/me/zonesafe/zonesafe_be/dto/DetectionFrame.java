@@ -16,7 +16,9 @@ import java.util.List;
 @AllArgsConstructor
 public class DetectionFrame {
     private Long cameraId;
+    private Long videoId;
     private ZonedDateTime frameTs;
+    private Double videoTimeSec;
     private List<DetectionObject> objects;
 
     @Getter

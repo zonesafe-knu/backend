@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import me.zonesafe.zonesafe_be.domain.Video;
 import me.zonesafe.zonesafe_be.domain.VideoAnalysisEvent;
 import me.zonesafe.zonesafe_be.domain.VideoAnalysisJob;
@@ -15,13 +16,24 @@ import me.zonesafe.zonesafe_be.enums.AnalysisJobStatus;
 import me.zonesafe.zonesafe_be.repository.VideoAnalysisEventRepository;
 import me.zonesafe.zonesafe_be.repository.VideoAnalysisJobRepository;
 import me.zonesafe.zonesafe_be.repository.VideoRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.annotation.PostConstruct;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -30,6 +42,30 @@ public class VideoAnalysisService {
     private final VideoAnalysisJobRepository jobRepository;
     private final VideoAnalysisEventRepository eventRepository;
     private final ObjectMapper objectMapper;
+
+    @Value("${detection.python-path:python}")
+    private String pythonPath;
+
+    @Value("${detection.script-dir:./detection}")
+    private String scriptDir;
+
+    @Value("${detection.model-path:./detection/best.pt}")
+    private String modelPath;
+
+    @Value("${videos.storage.base-path:./storage/videos}")
+    private String videosBasePath;
+
+    private final ExecutorService detectionExecutor = Executors.newCachedThreadPool();
+
+    @PostConstruct
+    public void autoStartOnBoot() {
+        List<me.zonesafe.zonesafe_be.domain.Video> videos = videoRepository.findAll();
+        for (me.zonesafe.zonesafe_be.domain.Video video : videos) {
+            if (video.getCameraContext() == null) continue;
+            log.info("서버 시작 — 영상 자동 분석 시작: videoId={}, cameraContext={}", video.getVideoId(), video.getCameraContext());
+            startAnalysis(video.getVideoId(), null);
+        }
+    }
 
     //영상 탐지 이벤트 목록
     public List<VideoEventResponseDto> getEventsByVideoId(Long videoId) {
@@ -115,16 +151,76 @@ public class VideoAnalysisService {
         job.setStatus(AnalysisJobStatus.QUEUED);
         job.setProgress(0.0);
 
-        //TODO: roiIds / saveClips / skipFrames / alarmRuleOverride 를 ML 파이프라인에 전달
-        //TODO: 비동기 워커가 job 을 RUNNING 으로 전환 후 프레임 단위 추론 수행
-
         VideoAnalysisJob saved = jobRepository.save(job);
+
+        Long cameraId = video.getCameraContext();
+        if (cameraId != null) {
+            detectionExecutor.submit(() -> runDetectionScript(saved.getJobId(), video, cameraId));
+        } else {
+            log.warn("영상에 카메라 연결 정보(cameraContext)가 없어 분석을 시작할 수 없습니다. videoId={}", videoId);
+        }
 
         VideoAnalyzeJobResponseDto dto = new VideoAnalyzeJobResponseDto();
         dto.setJobId(saved.getJobId());
         dto.setVideoId(video.getVideoId());
         dto.setStatus(saved.getStatus());
         return dto;
+    }
+
+    private void runDetectionScript(String jobId, Video video, Long cameraId) {
+        Path videoPath = Paths.get(videosBasePath).toAbsolutePath().resolve(video.getFilePath()).normalize();
+        Path scriptPath = Paths.get(scriptDir).toAbsolutePath().resolve("main.py").normalize();
+        Path modelAbsPath = Paths.get(modelPath).toAbsolutePath().normalize();
+
+        String backendUrl = "http://localhost:8080";
+
+        try {
+            jobRepository.findById(jobId).ifPresent(job -> {
+                job.setStatus(AnalysisJobStatus.RUNNING);
+                job.setStartedAt(ZonedDateTime.now());
+                jobRepository.save(job);
+            });
+
+            ProcessBuilder pb = new ProcessBuilder(
+                    pythonPath, "-u", scriptPath.toString(),
+                    "--source", videoPath.toString(),
+                    "--camera-id", cameraId.toString(),
+                    "--video-id", video.getVideoId().toString(),
+                    "--backend-url", backendUrl,
+                    "--model", modelAbsPath.toString(),
+                    "--skip-frames", "7",
+                    "--confidence", "0.3",
+                    "--loop"
+            );
+            pb.directory(Paths.get(scriptDir).toAbsolutePath().toFile());
+            pb.redirectErrorStream(true);
+
+            log.info("분석 시작: jobId={}, videoPath={}, cameraId={}", jobId, videoPath, cameraId);
+            Process process = pb.start();
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    log.info("[detection] {}", line);
+                }
+            }
+
+            int exitCode = process.waitFor();
+
+            jobRepository.findById(jobId).ifPresent(job -> {
+                job.setStatus(exitCode == 0 ? AnalysisJobStatus.COMPLETED : AnalysisJobStatus.FAILED);
+                job.setCompletedAt(ZonedDateTime.now());
+                jobRepository.save(job);
+            });
+
+            log.info("분석 종료: jobId={}, exitCode={}", jobId, exitCode);
+        } catch (Exception e) {
+            log.error("분석 실패: jobId={}", jobId, e);
+            jobRepository.findById(jobId).ifPresent(job -> {
+                job.setStatus(AnalysisJobStatus.FAILED);
+                jobRepository.save(job);
+            });
+        }
     }
 
     private String generateJobId() {

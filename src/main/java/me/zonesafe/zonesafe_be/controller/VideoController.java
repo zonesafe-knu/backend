@@ -8,6 +8,8 @@ import me.zonesafe.zonesafe_be.dto.VideoAnalyzeRequestDto;
 import me.zonesafe.zonesafe_be.dto.VideoEventResponseDto;
 import me.zonesafe.zonesafe_be.dto.VideoResponseDto;
 import me.zonesafe.zonesafe_be.enums.VideoStatus;
+import me.zonesafe.zonesafe_be.dto.DetectionFrame;
+import me.zonesafe.zonesafe_be.service.DetectionFrameStore;
 import me.zonesafe.zonesafe_be.service.VideoAnalysisService;
 import me.zonesafe.zonesafe_be.service.VideoService;
 import org.springframework.core.io.Resource;
@@ -28,7 +30,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/videos")
@@ -36,11 +37,12 @@ import java.util.Map;
 public class VideoController {
     private final VideoService videoService;
     private final VideoAnalysisService videoAnalysisService;
+    private final DetectionFrameStore detectionFrameStore;
 
     //영상 업로드 (TODO: Spring Security 도입 후 @PreAuthorize("hasAnyRole('ADMIN','OPERATOR')") 적용)
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public Map<String, Object> uploadVideo(
+    public VideoResponseDto uploadVideo(
             @RequestPart("file") MultipartFile file,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Long siteId,
@@ -49,30 +51,30 @@ public class VideoController {
     ) {
         //TODO: 인증 도입 후 SecurityContext 에서 username 추출
         String uploadedBy = "admin";
-        VideoResponseDto dto = videoService.uploadVideo(file, name, siteId, cameraContext, description, uploadedBy);
-        return Map.of("success", true, "data", dto);
+        return videoService.uploadVideo(file, name, siteId, cameraContext, description, uploadedBy);
     }
 
     //영상 목록 조회
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public Map<String, PageResponseDto<VideoResponseDto>> getVideos(
+    public PageResponseDto<VideoResponseDto> getVideos(
             @RequestParam(required = false) VideoStatus status,
             @RequestParam(required = false) Long siteId,
+            @RequestParam(required = false) Long cameraContext,
             @RequestParam(required = false) String uploadedBy,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime to,
             @PageableDefault(size = 20, sort = "uploadedAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        Page<VideoResponseDto> pageResult = videoService.getVideos(status, siteId, uploadedBy, from, to, pageable);
-        return Map.of("data", new PageResponseDto<>(pageResult));
+        Page<VideoResponseDto> pageResult = videoService.getVideos(status, siteId, cameraContext, uploadedBy, from, to, pageable);
+        return new PageResponseDto<>(pageResult);
     }
 
     //영상 상세 조회
     @GetMapping("/{videoId}")
     @ResponseStatus(HttpStatus.OK)
-    public Map<String, VideoResponseDto> getVideoById(@PathVariable Long videoId) {
-        return Map.of("data", videoService.getVideoById(videoId));
+    public VideoResponseDto getVideoById(@PathVariable Long videoId) {
+        return videoService.getVideoById(videoId);
     }
 
     //영상 삭제 (TODO: Spring Security 도입 후 @PreAuthorize 로 ADMIN 또는 소유자 검증)
@@ -139,27 +141,34 @@ public class VideoController {
     //영상 분석 시작 (TODO: Spring Security 도입 후 @PreAuthorize("hasAnyRole('ADMIN','OPERATOR')") 적용)
     @PostMapping("/{videoId}/analyze")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public Map<String, VideoAnalyzeJobResponseDto> startAnalysis(
+    public VideoAnalyzeJobResponseDto startAnalysis(
             @PathVariable Long videoId,
             @RequestBody(required = false) VideoAnalyzeRequestDto request
     ) {
-        return Map.of("data", videoAnalysisService.startAnalysis(videoId, request));
+        return videoAnalysisService.startAnalysis(videoId, request);
     }
 
     //영상 분석 작업 상태 조회
     @GetMapping("/{videoId}/analyze/jobs/{jobId}")
     @ResponseStatus(HttpStatus.OK)
-    public Map<String, VideoAnalysisJobStatusDto> getAnalysisJobStatus(
+    public VideoAnalysisJobStatusDto getAnalysisJobStatus(
             @PathVariable Long videoId,
             @PathVariable String jobId
     ) {
-        return Map.of("data", videoAnalysisService.getJobStatus(videoId, jobId));
+        return videoAnalysisService.getJobStatus(videoId, jobId);
     }
 
     //영상 내 탐지 이벤트 목록
     @GetMapping("/{videoId}/events")
     @ResponseStatus(HttpStatus.OK)
-    public Map<String, List<VideoEventResponseDto>> getEvents(@PathVariable Long videoId) {
-        return Map.of("data", videoAnalysisService.getEventsByVideoId(videoId));
+    public List<VideoEventResponseDto> getEvents(@PathVariable Long videoId) {
+        return videoAnalysisService.getEventsByVideoId(videoId);
+    }
+
+    //영상 탐지 프레임 전체 조회 (프론트 재생 시 바운딩박스 표시용)
+    @GetMapping("/{videoId}/detection-frames")
+    @ResponseStatus(HttpStatus.OK)
+    public List<DetectionFrame> getDetectionFrames(@PathVariable Long videoId) {
+        return detectionFrameStore.getAll(videoId);
     }
 }

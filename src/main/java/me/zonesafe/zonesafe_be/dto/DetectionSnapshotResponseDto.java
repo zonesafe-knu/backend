@@ -15,6 +15,7 @@ import java.util.List;
 public class DetectionSnapshotResponseDto {
     private Long cameraId;
     private ZonedDateTime frameTimestamp;
+    private Double videoTimeSec;
     private List<DetectedObjectDto> objects;
     private Double fps;
     private String modelVersion;

@@ -19,4 +19,6 @@ public class AlarmCreateRequest {
     private String detectionsJson;
     private Long clipId;
     private ZonedDateTime occurredAt;
+    private Long videoId;
+    private Double videoTimeSec;
 }
